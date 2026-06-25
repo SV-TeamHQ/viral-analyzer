@@ -1,0 +1,8 @@
+{
+  "competitors": [
+    { "handle": "example_handle_1", "niche": "AI tools" },
+    { "handle": "example_handle_2", "niche": "AI tools" }
+  ],
+  "posts_per_handle": 10,
+  "lookback_days": 7
+}
