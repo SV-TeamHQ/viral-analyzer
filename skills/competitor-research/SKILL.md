@@ -49,9 +49,14 @@ For videos: extracts N evenly-spaced JPEG frames + a mono 16 kHz wav. For
 images/carousels: reuses the downloaded file as the single frame. Writes `frames`
 and `audio_path` back onto each post.
 
-### Phase 3c — Transcribe Audio ⏳ *(not yet implemented)*
-Planned: `scripts/transcribe_audio.py` — local Whisper (`base` model) over
-`temp/audio/*.wav`, writing a transcript + hook per post.
+### Phase 3c — Transcribe Audio ✅
+```bash
+python scripts/transcribe_audio.py --input temp/selected_posts.json --transcripts-dir temp/transcripts --model base
+```
+Runs local Whisper (`base` model, loaded once per batch) over each post's audio,
+writing `temp/transcripts/{id}.txt` and adding `transcript` + `hook` (first
+segment) fields. Posts with no audio get empty strings. Requires `openai-whisper`
+installed (guarded import — pipeline runs without it until this phase executes).
 
 ### Phase 3d — Analyze Posts ⏳ *(not yet implemented)*
 Planned: spawn up to 5 `post-analyzer` sub-agents in parallel (batches of 5),
@@ -66,7 +71,7 @@ and ranked post cards (base64 frame thumbnails), written to
 
 ## Orchestration
 
-Run phases 1 → 3b sequentially now (3c/3d/4 are pending). Stop and report which
+Run phases 1 → 3c sequentially now (3d/4 are pending). Stop and report which
 phases are not yet implemented rather than skipping silently. When all phases
 exist, run the full sequence end-to-end.
 
