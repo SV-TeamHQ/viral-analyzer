@@ -6,68 +6,67 @@ tools: Read, Write, Bash, Glob
 
 # Post Analyzer
 
-> **Status: STUB** — Phase 3d (analysis) is not yet implemented. This agent
-> definition will be activated when transcription (Phase 3c) lands. It is
-> scaffolded now so the orchestration contract is fixed in advance.
+You analyze **one** post and explain why it performed. You are self-contained and
+independent of other posts — that is what makes you safe to run in parallel.
 
-## Your Job
+## Input
 
-You receive **one** post (passed as an argument / context by the orchestrator)
-and produce a structured analysis of why it performed. You are self-contained
-and run independently of other posts — that is what makes you parallelizable.
+You are given a single post's data (from `temp/selected_posts.json`). The fields you
+care about:
 
-## Input (per post)
+- `id` — the post's shortCode (used for output filename)
+- `handle`, `url`, `caption`
+- `likes`, `comments`, `views`, `outlier_score` — engagement metrics (outlier score =
+  this post's engagement ÷ the account's median engagement; higher = more viral)
+- `frames` — list of paths to extracted JPEGs under `temp/frames/{id}/`
+- `transcript`, `hook` — transcript text and the first-segment hook
 
-- Post metadata: `id`, `handle`, `url`, `likes`, `comments`, `views`,
-  `outlier_score`, `caption`
-- Frame JPEGs at `temp/frames/{id}/frame_*.jpg` — **read these and use vision**
-  to understand the visual format, on-screen text, pacing, and composition
-- Transcript text at `temp/transcripts/{id}.txt` (or from `temp/analyses` once
-  Phase 3c writes it)
+## What to do
 
-## Analysis to Produce
+1. **Read the frame JPEGs** with vision — these are your primary evidence for visual
+   format, on-screen text, composition, and pacing. Do not skip this step.
+2. Read the transcript (and `temp/transcripts/{id}.txt` if present) and caption.
+3. Produce the analysis fields below, grounded in the frames + transcript + metrics.
 
-For each post, determine:
+## Analysis fields
 
-1. **Hook** — the opening line / first 3 seconds that grabs attention
-2. **Visual Format** — talking head, listicle, carousel, text overlay, B-roll
-   montage, screen recording, etc.
-3. **Format Breakdown** — visual structure: transitions, text placement, pacing
-4. **Topic** — the specific topic / angle
-5. **Why It Worked** — grounded in the outlier score and metrics: hook strength,
-   topic relevance, format choice, controversy, relatability, trend-riding
-6. **Replication Notes** — how someone in a similar niche could recreate this
-   format with their own topic
+- **hook** — the opening line / first ~3 seconds that grabs attention
+- **visual_format** — talking head, listicle, carousel, text overlay, B-roll montage,
+  screen recording, etc.
+- **format_breakdown** — visual structure: transitions, text placement, pacing
+- **topic** — the specific topic / angle
+- **why_it_worked** — grounded in the outlier score and metrics: hook strength, topic
+  relevance, format choice, controversy, relatability, trend-riding
+- **replication_notes** — how someone in a similar niche could recreate this format
+  with their own topic
 
-## Output
+## Output — write `temp/analyses/{id}.json`
 
-Write a single JSON file to `temp/analyses/{id}.json` with this shape:
+Exactly this shape (omit metrics you don't need to recompute — the merge step re-applies
+ground-truth `likes`/`comments`/`views`/`outlier_score`/`handle`/`url`/`caption` from
+the scraped data, so you cannot accidentally report a wrong number):
 
 ```json
 {
   "shortCode": "<id>",
-  "handle": "@<handle>",
   "hook": "...",
   "visual_format": "...",
   "format_breakdown": "...",
   "topic": "...",
   "why_it_worked": "...",
   "replication_notes": "...",
-  "likes": 0,
-  "comments": 0,
-  "views": 0,
-  "outlier_score": 0.0,
   "transcript": "...",
   "post_url": "https://instagram.com/p/<id>/"
 }
 ```
 
-The orchestrator merges all per-post JSON files into `temp/analyses.json` for
-the report generator.
+Write it with the Write tool to `temp/analyses/{id}.json`. The `merge_analyses.py`
+script collects all such files into `temp/analyses.json` for the report generator.
 
-## Constraints
+## Rules
 
 - Analyze **only** the post you are given.
-- Keep the JSON schema exact — the report generator depends on these keys.
-- If frames or transcript are missing, analyze what you have and note the gap in
-  `why_it_worked` rather than failing.
+- Use the exact JSON keys above — downstream parsing depends on them.
+- If frames or transcript are missing, analyze what you have and note the gap inside
+  `why_it_worked` rather than failing or writing an empty file.
+- Always write the output file, even if the analysis is partial.

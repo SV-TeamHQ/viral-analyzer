@@ -58,11 +58,27 @@ writing `temp/transcripts/{id}.txt` and adding `transcript` + `hook` (first
 segment) fields. Posts with no audio get empty strings. Requires `openai-whisper`
 installed (guarded import — pipeline runs without it until this phase executes).
 
-### Phase 3d — Analyze Posts ⏳ *(not yet implemented)*
-Planned: spawn up to 5 `post-analyzer` sub-agents in parallel (batches of 5),
-each reading one post's frames (Claude vision) + transcript + engagement metrics
-and writing structured JSON to `temp/analyses/{id}.json`. Merge into
-`temp/analyses.json`. See `agents/post-analyzer.md`.
+### Phase 3d — Analyze Posts ✅
+
+Analyze each post with **Claude sub-agents** (in-conversation, using vision on the
+extracted frames). This is orchestration, not a single script:
+
+1. Read `temp/selected_posts.json` (fully enriched with `frames`, `transcript`, `hook`,
+   metrics).
+2. **Fan out** the `post-analyzer` sub-agent (see `agents/post-analyzer.md`) — spawn up
+   to **5 in parallel per batch** via the Agent tool, ~15 posts = 3 sequential batches.
+   Wait for each batch to finish before spawning the next.
+3. Each sub-agent reads its post's frame JPEGs (vision) + transcript + metrics and
+   writes `temp/analyses/{id}.json`.
+4. Merge the per-post files:
+   ```bash
+   python scripts/merge_analyses.py --input temp/selected_posts.json --analyses-dir temp/analyses --output temp/analyses.json
+   ```
+   This re-applies ground-truth metrics from the scraped data and emits a placeholder
+   for any post whose analysis is missing.
+
+If fewer than ~3 posts analyze successfully, warn the user that the report may not be
+representative before continuing.
 
 ### Phase 4 — Generate Report ⏳ *(not yet implemented)*
 Planned: `scripts/generate_report.py` — Jinja2 HTML report with a niche summary
@@ -71,9 +87,9 @@ and ranked post cards (base64 frame thumbnails), written to
 
 ## Orchestration
 
-Run phases 1 → 3c sequentially now (3d/4 are pending). Stop and report which
-phases are not yet implemented rather than skipping silently. When all phases
-exist, run the full sequence end-to-end.
+Run phases 1 → 3d (Phase 4 is pending). Stop and report which phases are not yet
+implemented rather than skipping silently. When all phases exist, run the full
+sequence end-to-end.
 
 ### Status legend
 - ✅ implemented & tested
