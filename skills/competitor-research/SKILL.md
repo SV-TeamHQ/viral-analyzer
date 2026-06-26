@@ -80,16 +80,23 @@ extracted frames). This is orchestration, not a single script:
 If fewer than ~3 posts analyze successfully, warn the user that the report may not be
 representative before continuing.
 
-### Phase 4 — Generate Report ⏳ *(not yet implemented)*
-Planned: `scripts/generate_report.py` — Jinja2 HTML report with a niche summary
-and ranked post cards (base64 frame thumbnails), written to
-`output/reports/IG-Competitor-Research_{YYYY-MM-DD}.html`.
+### Phase 4 — Generate Report ✅
+```bash
+python scripts/generate_report.py --input temp/analyses.json --output-dir output/reports --summary temp/niche_summary.txt
+```
+Renders a self-contained HTML report (`output/reports/IG-Competitor-Research_{date}.html`)
+via `templates/report.html.j2`: header (date/handles/post count), niche summary, ranked
+cards with base64-embedded frame thumbnails, metrics, hook, format, breakdown, collapsible
+transcript, why-it-worked, replication notes, and a link to the original post. Unanalyzed
+posts render a placeholder card. The `--summary` file (an AI niche summary produced by a
+sub-agent in Phase 3d/4) overrides the data-driven fallback summary.
 
 ## Orchestration
 
-Run phases 1 → 3d (Phase 4 is pending). Stop and report which phases are not yet
-implemented rather than skipping silently. When all phases exist, run the full
-sequence end-to-end.
+Run phases 1 → 4 end-to-end. All phases are implemented. After the Phase 3d
+analysis + merge, optionally spawn a sub-agent to draft an AI niche summary and
+write it to `temp/niche_summary.txt` before running Phase 4 (otherwise the report
+uses the data-driven fallback summary).
 
 ### Status legend
 - ✅ implemented & tested

@@ -55,3 +55,10 @@ class TestMergeAnalyses:
             {"likes": 99999, "why_it_worked": "w"}))
         result = merge_analyses(SELECTED, str(tmp_path))
         assert result[0]["likes"] == 100
+
+    def test_frames_carry_through(self, tmp_path):
+        selected = [{"id": "A1", "handle": "c1", "url": "u", "likes": 1, "comments": 0,
+                     "views": 10, "outlier_score": 1.0, "caption": "",
+                     "frames": ["temp/frames/A1/frame_01.jpg"]}]
+        result = merge_analyses(selected, str(tmp_path))
+        assert result[0]["frames"] == ["temp/frames/A1/frame_01.jpg"]

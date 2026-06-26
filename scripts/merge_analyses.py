@@ -5,7 +5,7 @@ import os
 # Ground-truth metrics/metadata that always come from the scraped post, never
 # from the sub-agent's analysis (so the report can't show a hallucinated number).
 METADATA_KEYS = ("id", "handle", "url", "likes", "comments", "views",
-                 "outlier_score", "caption")
+                 "outlier_score", "caption", "frames")
 
 
 def load_analysis(post_id: str, analyses_dir: str) -> dict | None:

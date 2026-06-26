@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IG Competitor Research Report — {{ date_str }}</title>
+  <style>
+    :root {
+      --bg: #0f1115; --card: #1a1d24; --ink: #e7e9ee; --dim: #9aa0aa;
+      --accent: #e1306c; --accent2: #833ab4; --line: #2a2e37;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink);
+      font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 80px; }
+    h1 { font-size: 28px; margin: 0 0 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .meta { color: var(--dim); font-size: 14px; margin-bottom: 24px; }
+    .summary { background: var(--card); border: 1px solid var(--line);
+      border-radius: 12px; padding: 20px; margin-bottom: 28px; }
+    .summary h2 { margin: 0 0 8px; font-size: 18px; }
+    .card { background: var(--card); border: 1px solid var(--line);
+      border-radius: 14px; padding: 20px; margin-bottom: 18px; display: grid;
+      grid-template-columns: 90px 1fr; gap: 18px; }
+    .rank { font-size: 40px; font-weight: 800; color: var(--accent);
+      text-align: center; align-self: start; }
+    .thumb { width: 100%; border-radius: 8px; margin-top: 8px;
+      display: block; max-height: 220px; object-fit: cover; }
+    .handle { font-weight: 700; font-size: 16px; }
+    .metrics { color: var(--dim); font-size: 13px; margin: 4px 0 12px;
+      display: flex; gap: 14px; flex-wrap: wrap; }
+    .metrics .outlier { color: var(--accent); font-weight: 700; }
+    .hook { font-style: italic; color: #cdd2da; margin: 0 0 12px;
+      border-left: 3px solid var(--accent2); padding-left: 12px; }
+    .field { margin: 8px 0; }
+    .field .label { color: var(--dim); font-size: 12px; text-transform: uppercase;
+      letter-spacing: .04em; }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+    .link { display: inline-block; margin-top: 12px; color: var(--accent);
+      text-decoration: none; font-weight: 600; }
+    .link:hover { text-decoration: underline; }
+    .placeholder { color: var(--dim); font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>IG Competitor Research Report</h1>
+    <div class="meta">
+      Generated: {{ date_str }} &middot;
+      Handles: {{ handles | join(", ") }} &middot;
+      Posts: {{ total }}
+    </div>
+
+    <section class="summary">
+      <h2>🔥 What's Working in the Niche</h2>
+      <p>{{ summary }}</p>
+    </section>
+
+    {% for post in posts %}
+    <article class="card">
+      <div class="rank">#{{ post.rank }}</div>
+      <div>
+        <div class="handle">@{{ post.handle }}</div>
+        <div class="metrics">
+          <span>❤️ {{ "{:,}".format(post.likes) }}</span>
+          <span>💬 {{ "{:,}".format(post.comments) }}</span>
+          {% if post.views %}<span>👁️ {{ "{:,}".format(post.views) }}</span>{% endif %}
+          <span class="outlier">⚡ {{ post.outlier_score }}x outlier</span>
+        </div>
+
+        {% if post.thumbnail %}
+          <img class="thumb" src="{{ post.thumbnail }}" alt="frame for @{{ post.handle }}">
+        {% endif %}
+
+        {% if post.analyzed %}
+          {% if post.hook %}<p class="hook">"{{ post.hook }}"</p>{% endif %}
+          {% if post.visual_format %}<div class="field"><div class="label">Format</div><div>{{ post.visual_format }}</div></div>{% endif %}
+          {% if post.format_breakdown %}<div class="field"><div class="label">Format Breakdown</div><div>{{ post.format_breakdown }}</div></div>{% endif %}
+          {% if post.topic %}<div class="field"><div class="label">Topic</div><div>{{ post.topic }}</div></div>{% endif %}
+          {% if post.why_it_worked %}<div class="field"><div class="label">Why It Worked</div><div>{{ post.why_it_worked }}</div></div>{% endif %}
+          {% if post.replication_notes %}<div class="field"><div class="label">Replication Notes</div><div>{{ post.replication_notes }}</div></div>{% endif %}
+          {% if post.transcript %}
+          <details><summary>Transcript</summary><p>{{ post.transcript }}</p></details>
+          {% endif %}
+        {% else %}
+          <p class="placeholder">{{ post.why_it_worked }}</p>
+        {% endif %}
+
+        <a class="link" href="{{ post.url }}" target="_blank" rel="noopener">View Original Post →</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</body>
+</html>
