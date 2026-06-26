@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
+  "name": "viral-analyzer",
+  "owner": {
+    "name": "Your Team"
+  },
+  "description": "Instagram competitor research automation plugin.",
+  "plugins": [
+    {
+      "name": "viral-analyzer",
+      "source": "./",
+      "description": "Instagram competitor research pipeline — scrape, rank, analyze, and report on competitor posts."
+    }
+  ]
+}

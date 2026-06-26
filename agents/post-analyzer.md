@@ -11,21 +11,22 @@ independent of other posts — that is what makes you safe to run in parallel.
 
 ## Input
 
-You are given a single post's data (from `temp/selected_posts.json`). The fields you
-care about:
+You are given a single post's data (from `${CLAUDE_PROJECT_DIR}/temp/selected_posts.json`).
+The fields you care about:
 
 - `id` — the post's shortCode (used for output filename)
 - `handle`, `url`, `caption`
 - `likes`, `comments`, `views`, `outlier_score` — engagement metrics (outlier score =
   this post's engagement ÷ the account's median engagement; higher = more viral)
-- `frames` — list of paths to extracted JPEGs under `temp/frames/{id}/`
+- `frames` — list of paths to extracted JPEGs under `${CLAUDE_PROJECT_DIR}/temp/frames/{id}/`
 - `transcript`, `hook` — transcript text and the first-segment hook
 
 ## What to do
 
 1. **Read the frame JPEGs** with vision — these are your primary evidence for visual
    format, on-screen text, composition, and pacing. Do not skip this step.
-2. Read the transcript (and `temp/transcripts/{id}.txt` if present) and caption.
+2. Read the transcript (and `${CLAUDE_PROJECT_DIR}/temp/transcripts/{id}.txt` if present)
+   and caption.
 3. Produce the analysis fields below, grounded in the frames + transcript + metrics.
 
 ## Analysis fields
@@ -40,7 +41,7 @@ care about:
 - **replication_notes** — how someone in a similar niche could recreate this format
   with their own topic
 
-## Output — write `temp/analyses/{id}.json`
+## Output — write `${CLAUDE_PROJECT_DIR}/temp/analyses/{id}.json`
 
 Exactly this shape (omit metrics you don't need to recompute — the merge step re-applies
 ground-truth `likes`/`comments`/`views`/`outlier_score`/`handle`/`url`/`caption` from
@@ -60,8 +61,9 @@ the scraped data, so you cannot accidentally report a wrong number):
 }
 ```
 
-Write it with the Write tool to `temp/analyses/{id}.json`. The `merge_analyses.py`
-script collects all such files into `temp/analyses.json` for the report generator.
+Write it with the Write tool to `${CLAUDE_PROJECT_DIR}/temp/analyses/{id}.json`. The
+`merge_analyses.py` script collects all such files into
+`${CLAUDE_PROJECT_DIR}/temp/analyses.json` for the report generator.
 
 ## Rules
 

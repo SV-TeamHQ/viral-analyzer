@@ -1,6 +1,6 @@
 ---
 name: competitor-research
-description: Runs the Instagram competitor research pipeline — scrape competitor posts via Apify, rank by engagement outlier score, download media, extract frames/audio, analyze why each top post performed, and generate a ranked HTML report. Use when the user wants to research what's working in an Instagram niche, analyze competitors' top-performing posts, or generate a competitor research report. Triggered by "/competitor-research" or "/ig-research", or natural language like "research my Instagram competitors" or "what's working in my niche".
+description: Runs the Instagram competitor research pipeline — scrape competitor posts via Apify, rank by engagement outlier score, download media, extract frames/audio, transcribe, analyze why each top post performed, and generate a ranked HTML report. Use when the user wants to research what's working in an Instagram niche, analyze competitors' top-performing posts, or generate a competitor research report. Triggered by "/competitor-research" or "/ig-research", or natural language like "research my Instagram competitors" or "what's working in my niche".
 ---
 
 # Instagram Competitor Research
@@ -8,102 +8,132 @@ description: Runs the Instagram competitor research pipeline — scrape competit
 Orchestrates a 5-phase Python pipeline that turns a list of competitor Instagram
 handles into a ranked HTML report explaining why their top posts performed.
 
-## Prerequisites
+## Path conventions (important)
 
-- **Python 3.10+** with `requirements.txt` installed (`pip install -r requirements.txt`)
-- **FFmpeg + FFprobe** on PATH (frame + audio extraction)
-- **`APIFY_TOKEN`** set in `.env` (Instagram scraping)
-- Real competitor handles in `config/competitors.json` (replace the placeholders)
+This skill ships as a Claude Code plugin, so it must not assume a working directory.
+Two substitution variables are used throughout (Claude Code fills these in):
+
+- **`${CLAUDE_PLUGIN_ROOT}`** — where the plugin's bundled code lives (scripts, templates,
+  the competitors template). Treat it as **read-only**; it changes on plugin updates.
+- **`${CLAUDE_PROJECT_DIR}`** — the user's project. All working data, outputs, the user's
+  competitor list, and `.env` live here.
+
+Set these in your head before running anything:
+- Scripts → `${CLAUDE_PLUGIN_ROOT}/scripts/<name>.py`
+- Working data → `${CLAUDE_PROJECT_DIR}/temp/...`
+- Reports → `${CLAUDE_PROJECT_DIR}/output/reports/...`
+- User config → `${CLAUDE_PROJECT_DIR}/config/competitors.json`
+- Secrets → `${CLAUDE_PROJECT_DIR}/.env` (read by `python-dotenv` from the CWD)
+
+## First-run setup
+
+Before the first run, ensure prerequisites are met. Run these checks and stop with a
+clear instruction if any fail:
+
+1. **Python deps** — `python -c "import requests, jinja2, apify_client"` (and `whisper`
+   before Phase 3c). If missing, tell the user to run
+   `pip install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt"`.
+2. **ffmpeg/ffprobe** — `ffmpeg -version` and `ffprobe -version`. If missing, instruct the
+   user to install FFmpeg.
+3. **`APIFY_TOKEN`** — check `${CLAUDE_PROJECT_DIR}/.env` (or the environment). If absent,
+   tell the user to create `${CLAUDE_PROJECT_DIR}/.env` with `APIFY_TOKEN=...`.
+4. **Competitor list** — if `${CLAUDE_PROJECT_DIR}/config/competitors.json` does NOT exist,
+   copy the template: `${CLAUDE_PLUGIN_ROOT}/config/competitors.json` →
+   `${CLAUDE_PROJECT_DIR}/config/competitors.json`, then tell the user to replace the
+   `example_handle_*` placeholders with real handles before continuing.
+
+Do not proceed until the user has real handles configured.
 
 ## Pipeline Phases
 
-Each phase is an independently-testable Python script in `scripts/`. Run them in
-order from the repo root. Each consumes the previous phase's output under `temp/`.
+Run each phase in order. Every script accepts explicit paths via CLI flags, so pass the
+`${CLAUDE_PROJECT_DIR}`-rooted paths explicitly rather than relying on defaults.
 
 ### Phase 1 — Scrape ✅
 ```bash
-python scripts/scrape_instagram.py --config config/competitors.json --output temp/raw_posts.json
+python "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_instagram.py" \
+  --config "${CLAUDE_PROJECT_DIR}/config/competitors.json" \
+  --output "${CLAUDE_PROJECT_DIR}/temp/raw_posts.json"
 ```
-Scrapes recent posts (default last 7 days) for each handle via Apify's
-`apify/instagram-scraper`. Output: `temp/raw_posts.json` (normalized posts).
 
 ### Phase 2 — Rank & Select ✅
 ```bash
-python scripts/rank_and_select.py --input temp/raw_posts.json --output temp/selected_posts.json --top-per-handle 3
+python "${CLAUDE_PLUGIN_ROOT}/scripts/rank_and_select.py" \
+  --input "${CLAUDE_PROJECT_DIR}/temp/raw_posts.json" \
+  --output "${CLAUDE_PROJECT_DIR}/temp/selected_posts.json" \
+  --top-per-handle 3
 ```
-Selects top posts per handle and ranks by **outlier score** (`engagement /
-account median`). Output: `temp/selected_posts.json`.
 
 ### Phase 3a — Download Media ✅
 ```bash
-python scripts/download_media.py --input temp/selected_posts.json --output-dir temp/media
+python "${CLAUDE_PLUGIN_ROOT}/scripts/download_media.py" \
+  --input "${CLAUDE_PROJECT_DIR}/temp/selected_posts.json" \
+  --output-dir "${CLAUDE_PROJECT_DIR}/temp/media"
 ```
-Downloads each post's video/image/carousel. Writes `local_media_path` back onto
-each post (None if the CDN URL failed).
 
 ### Phase 3b — Extract Frames & Audio ✅
 ```bash
-python scripts/extract_frames.py --input temp/selected_posts.json --frames-dir temp/frames --audio-dir temp/audio --num-frames 4
+python "${CLAUDE_PLUGIN_ROOT}/scripts/extract_frames.py" \
+  --input "${CLAUDE_PROJECT_DIR}/temp/selected_posts.json" \
+  --frames-dir "${CLAUDE_PROJECT_DIR}/temp/frames" \
+  --audio-dir "${CLAUDE_PROJECT_DIR}/temp/audio" \
+  --num-frames 4
 ```
-For videos: extracts N evenly-spaced JPEG frames + a mono 16 kHz wav. For
-images/carousels: reuses the downloaded file as the single frame. Writes `frames`
-and `audio_path` back onto each post.
 
 ### Phase 3c — Transcribe Audio ✅
 ```bash
-python scripts/transcribe_audio.py --input temp/selected_posts.json --transcripts-dir temp/transcripts --model base
+python "${CLAUDE_PLUGIN_ROOT}/scripts/transcribe_audio.py" \
+  --input "${CLAUDE_PROJECT_DIR}/temp/selected_posts.json" \
+  --transcripts-dir "${CLAUDE_PROJECT_DIR}/temp/transcripts" \
+  --model base
 ```
-Runs local Whisper (`base` model, loaded once per batch) over each post's audio,
-writing `temp/transcripts/{id}.txt` and adding `transcript` + `hook` (first
-segment) fields. Posts with no audio get empty strings. Requires `openai-whisper`
-installed (guarded import — pipeline runs without it until this phase executes).
+Requires `openai-whisper` installed.
 
 ### Phase 3d — Analyze Posts ✅
 
 Analyze each post with **Claude sub-agents** (in-conversation, using vision on the
 extracted frames). This is orchestration, not a single script:
 
-1. Read `temp/selected_posts.json` (fully enriched with `frames`, `transcript`, `hook`,
-   metrics).
-2. **Fan out** the `post-analyzer` sub-agent (see `agents/post-analyzer.md`) — spawn up
-   to **5 in parallel per batch** via the Agent tool, ~15 posts = 3 sequential batches.
-   Wait for each batch to finish before spawning the next.
-3. Each sub-agent reads its post's frame JPEGs (vision) + transcript + metrics and
-   writes `temp/analyses/{id}.json`.
-4. Merge the per-post files:
+1. Read `${CLAUDE_PROJECT_DIR}/temp/selected_posts.json` (fully enriched with `frames`,
+   `transcript`, `hook`, metrics).
+2. **Fan out** the `post-analyzer` sub-agent (see `agents/post-analyzer.md`) — spawn up to
+   **5 in parallel per batch** via the Agent tool, ~15 posts = 3 sequential batches. Wait
+   for each batch to finish before spawning the next.
+3. Each sub-agent reads its post's frame JPEGs (vision) + transcript + metrics and writes
+   `${CLAUDE_PROJECT_DIR}/temp/analyses/{id}.json`.
+4. Merge the per-post files (re-applies ground-truth metrics; placeholders for gaps):
    ```bash
-   python scripts/merge_analyses.py --input temp/selected_posts.json --analyses-dir temp/analyses --output temp/analyses.json
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/merge_analyses.py" \
+     --input "${CLAUDE_PROJECT_DIR}/temp/selected_posts.json" \
+     --analyses-dir "${CLAUDE_PROJECT_DIR}/temp/analyses" \
+     --output "${CLAUDE_PROJECT_DIR}/temp/analyses.json"
    ```
-   This re-applies ground-truth metrics from the scraped data and emits a placeholder
-   for any post whose analysis is missing.
 
 If fewer than ~3 posts analyze successfully, warn the user that the report may not be
 representative before continuing.
 
 ### Phase 4 — Generate Report ✅
 ```bash
-python scripts/generate_report.py --input temp/analyses.json --output-dir output/reports --summary temp/niche_summary.txt
+python "${CLAUDE_PLUGIN_ROOT}/scripts/generate_report.py" \
+  --input "${CLAUDE_PROJECT_DIR}/temp/analyses.json" \
+  --output-dir "${CLAUDE_PROJECT_DIR}/output/reports" \
+  --summary "${CLAUDE_PROJECT_DIR}/temp/niche_summary.txt"
 ```
-Renders a self-contained HTML report (`output/reports/IG-Competitor-Research_{date}.html`)
-via `templates/report.html.j2`: header (date/handles/post count), niche summary, ranked
-cards with base64-embedded frame thumbnails, metrics, hook, format, breakdown, collapsible
-transcript, why-it-worked, replication notes, and a link to the original post. Unanalyzed
-posts render a placeholder card. The `--summary` file (an AI niche summary produced by a
-sub-agent in Phase 3d/4) overrides the data-driven fallback summary.
+The `--summary` file is optional: if absent (or `--summary ""`), the report uses a
+data-driven fallback summary. The HTML report (with base64-embedded frame thumbnails)
+is written to `${CLAUDE_PROJECT_DIR}/output/reports/IG-Competitor-Research_{date}.html`.
 
 ## Orchestration
 
-Run phases 1 → 4 end-to-end. All phases are implemented. After the Phase 3d
-analysis + merge, optionally spawn a sub-agent to draft an AI niche summary and
-write it to `temp/niche_summary.txt` before running Phase 4 (otherwise the report
-uses the data-driven fallback summary).
+Run phases 1 → 4 end-to-end. All phases are implemented. After the Phase 3d analysis +
+merge, optionally spawn a sub-agent to draft an AI niche summary and write it to
+`${CLAUDE_PROJECT_DIR}/temp/niche_summary.txt` before Phase 4.
 
-### Status legend
-- ✅ implemented & tested
-- ⏳ scaffolded / pending — do not attempt to run
+After a successful run, you may offer to clean up `${CLAUDE_PROJECT_DIR}/temp/` (it is
+recreated on the next run). Keep `${CLAUDE_PROJECT_DIR}/output/reports/`.
 
 ## Notes
-- Instagram CDN URLs expire within hours — always download immediately after scraping.
+- Instagram CDN URLs expire within hours — always run Phase 3a immediately after Phase 1.
 - All scripts are independently runnable and tested (`python -m pytest`).
 - Architecture is "Instagram first, pluggable": a new platform = a new
   `scrape_<platform>.py` with the same normalize→rank→download interface.
