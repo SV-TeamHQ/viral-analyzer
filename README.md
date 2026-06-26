@@ -29,22 +29,87 @@ frames) — not an API call — so there's no extra LLM cost beyond your Claude 
 
 ---
 
-## Prerequisites
+## Prerequisites & dependencies
 
-| Tool | Why | Install |
-|------|-----|---------|
-| **Python 3.10+** | pipeline runtime | — |
-| **FFmpeg + FFprobe** | frame + audio extraction (Phase 3b) | `winget install ffmpeg` (Windows) / `brew install ffmpeg` (macOS) |
-| **Apify account + token** | Instagram scraping (Phase 1) | apify.com → Settings → API & Integrations → copy token |
+Each teammate needs to set these up once on their own machine.
 
-Then install Python deps:
+### 1. System dependencies
+
+| Tool | Why | Min. version | Install |
+|------|-----|--------------|---------|
+| **Python** | pipeline runtime | 3.10+ | [python.org](https://www.python.org/downloads/) — ensure `python` and `pip` are on your PATH |
+| **FFmpeg** (+ ffprobe) | extract video frames + audio (Phase 3b) | any recent | Windows: `winget install ffmpeg` · macOS: `brew install ffmpeg` · Linux (Debian/Ubuntu): `sudo apt install ffmpeg` |
+
+Verify:
+```bash
+python --version      # >= 3.10
+ffmpeg -version
+ffprobe -version
+```
+
+### 2. Python dependencies
+
+From the repo (or plugin) root:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-> `openai-whisper` (Phase 3c) pulls in PyTorch (~2 GB). The pipeline imports cleanly
-> without it; you only need it installed when you actually run transcription.
+What you get and why:
+
+| Package | Purpose | Phase |
+|---------|---------|-------|
+| `requests` | download media from Instagram CDN | 3a |
+| `apify-client` | run the Instagram scraper actor on Apify | 1 |
+| `python-dotenv` | load `APIFY_TOKEN` from `.env` | 1 |
+| `openai-whisper` | local speech-to-text transcription (**pulls in PyTorch ~2 GB**) | 3c |
+| `jinja2` | render the HTML report | 4 |
+| `Pillow` | image handling | 4 |
+| `pytest` | run the test suite (dev only) | — |
+
+> **Heavy dep note:** `openai-whisper` transitively installs **PyTorch (~2 GB)**. The
+> pipeline imports cleanly without it — you only need it when you actually run Phase 3c
+> (transcription). If you want a minimal install first, do everything *except* whisper:
+> ```bash
+> pip install requests apify-client python-dotenv jinja2 Pillow pytest
+> pip install openai-whisper   # add this when you're ready to transcribe
+> ```
+> Whisper also needs a CUDA-capable GPU for best speed but runs on CPU (slower). On first
+> run it downloads the `base` model (~74 MB) automatically.
+
+### 3. Accounts & secrets
+
+| Service | Why | How to get it |
+|---------|-----|---------------|
+| **Apify** | Instagram scraping (Phase 1) | Sign up at [apify.com](https://apify.com) → **Settings → API & Integrations** → copy your API token. The free tier ($5/mo credit) covers ~33 runs/month. |
+
+Put the token in `.env` in your **project root** (where you launch Claude Code), not in
+the plugin:
+```
+APIFY_TOKEN=your_apify_api_token_here
+```
+
+That's the only required secret. There is **no per-run LLM cost** — Phase 3d analysis runs
+as Claude sub-agents inside your existing Claude Code session, so it's covered by your
+Claude subscription (no separate `ANTHROPIC_API_KEY` needed).
+
+### Quick setup checklist (for a teammate)
+
+```bash
+# 1. system deps
+winget install ffmpeg          # or: brew install ffmpeg  /  sudo apt install ffmpeg
+
+# 2. python deps
+pip install -r requirements.txt
+
+# 3. secrets — create .env in your project root
+echo "APIFY_TOKEN=your_token_here" > .env
+
+# 4. (in Claude Code) install the plugin, then run it
+#    /plugin marketplace add your-org/viral-analyzer
+#    /plugin install viral-analyzer@viral-analyzer
+#    /competitor-research
+```
 
 ---
 
