@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-marketplace.json",
   "name": "viral-analyzer",
   "owner": {
-    "name": "Your Team"
+    "name": "Jude SV"
   },
   "description": "Instagram competitor research automation plugin.",
   "plugins": [

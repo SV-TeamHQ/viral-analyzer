@@ -3,6 +3,8 @@
   "name": "viral-analyzer",
   "displayName": "IG Competitor Research",
   "description": "Instagram competitor research pipeline — scrape competitor posts via Apify, rank by engagement outlier score, extract frames/audio, transcribe, analyze why each top post performed, and generate a ranked HTML report.",
-  "version": "0.1.0",
+  "author": {
+    "name": "Jude SV"
+  },
   "keywords": ["instagram", "competitor-research", "analytics", "report"]
 }

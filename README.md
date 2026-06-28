@@ -215,8 +215,8 @@ The pipeline is "Instagram first, pluggable": adding a platform means a new
 
 - **Instagram CDN URLs expire within hours** — the pipeline always downloads media
   immediately after scraping (Phases 1 → 3a back-to-back).
-- **Versioning:** `plugin.json` pins `version: 0.1.0`. For a team iterating fast, remove
-  the `version` field so every commit ships a new version (git-SHA-based); otherwise bump
-  the version on each release and teammates run `/plugin update`.
-- **Marketplace owner:** `.claude-plugin/marketplace.json` uses the placeholder
-  `"Your Team"` — replace it with your team/org name before sharing.
+- **Versioning (rolling):** `plugin.json` intentionally has **no `version` field**, so
+  every git commit becomes a new version (Claude Code uses the commit SHA). Teammates get
+  your latest changes with `/plugin marketplace update` then `/plugin update` — no version
+  bump required. (If you ever want pinned releases, add a `version` field back and tag
+  releases with `claude plugin tag --push`.)
