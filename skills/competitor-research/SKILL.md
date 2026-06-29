@@ -131,10 +131,11 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/generate_report.py" \
 ```
 The `--summary` file is optional: if absent (or `--summary ""`), the report uses a
 data-driven fallback summary. The HTML report (full frame images rendered with
-`object-fit: contain`) is written to `${CLAUDE_PROJECT_DIR}/output/reports/IG-Competitor-Research_{date}.html`.
+`object-fit: contain`) is written to `${CLAUDE_PROJECT_DIR}/output/reports/IG-Competitor-Research_{date}_{HHMM}.html`
+(run-versioned by date + minute, so same-day re-runs never overwrite).
 
 By default a **PDF** is also rendered from that HTML (`--pdf`, disable with `--no-pdf`)
-into `IG-Competitor-Research_{date}.pdf` via headless Chromium. Requires Playwright:
+into `IG-Competitor-Research_{date}_{HHMM}.pdf` via headless Chromium. Requires Playwright:
 `pip install playwright && playwright install chromium`. If Playwright isn't installed,
 the PDF step is skipped (non-fatal) and the HTML is still produced. To render a PDF from
 an existing HTML file directly: `python "${CLAUDE_PLUGIN_ROOT}/scripts/generate_pdf.py" --html <report.html>`.

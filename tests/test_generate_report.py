@@ -95,3 +95,13 @@ class TestGenerateReport:
 
         generate_report(str(analyses_file), str(tmp_path / "reports"), summary_path=None,
                         date_str="2026-06-29", pdf=False)
+
+    def test_real_run_filename_is_timestamp_versioned(self, tmp_path):
+        # no date_str passed (a real run) -> filename is run-versioned so same-day
+        # re-runs don't overwrite each other: IG-Competitor-Research_YYYY-MM-DD_HHMM.html
+        import re
+        analyses_file = tmp_path / "analyses.json"
+        analyses_file.write_text(json.dumps(ANALYSES))
+        path = generate_report(str(analyses_file), str(tmp_path / "reports"), summary_path=None)
+        name = os.path.basename(path)
+        assert re.match(r"IG-Competitor-Research_\d{4}-\d{2}-\d{2}_\d{4}\.html$", name), name

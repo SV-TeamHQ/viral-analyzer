@@ -3,7 +3,7 @@ import base64
 import json
 import os
 from collections import Counter
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -61,12 +61,20 @@ def generate_report(input_path: str, output_dir: str, summary_path: str | None =
         with open(summary_path, encoding="utf-8") as f:
             summary = f.read().strip() or summary
 
-    date_str = date_str or date.today().isoformat()
+    date_str_is_override = date_str is not None
+    date_str = date_str or datetime.now().strftime("%Y-%m-%d")
     html = render_report(analyses, summary, date_str,
                          str(TEMPLATE_DIR / "report.html.j2"))
 
     os.makedirs(output_dir, exist_ok=True)
-    out_path = os.path.join(output_dir, f"IG-Competitor-Research_{date_str}.html")
+    # Run-versioned filename: a real run (no date_str) stamps date_HHMM so same-day
+    # re-runs never overwrite. An explicit date_str is used as-is (deterministic, for
+    # tests / scripted calls). The header inside the report always shows date_str.
+    if date_str_is_override:
+        stamp = date_str
+    else:
+        stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    out_path = os.path.join(output_dir, f"IG-Competitor-Research_{stamp}.html")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"Wrote report -> {out_path}")
@@ -79,7 +87,7 @@ def generate_report(input_path: str, output_dir: str, summary_path: str | None =
             from scripts.generate_pdf import render_pdf
         except ModuleNotFoundError:
             from generate_pdf import render_pdf
-        pdf_path = os.path.join(output_dir, f"IG-Competitor-Research_{date_str}.pdf")
+        pdf_path = os.path.join(output_dir, f"IG-Competitor-Research_{stamp}.pdf")
         if render_pdf(out_path, pdf_path):
             print(f"Wrote PDF -> {pdf_path}")
 

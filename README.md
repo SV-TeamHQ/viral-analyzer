@@ -22,7 +22,7 @@ or natural language like *"research my Instagram competitors."*
 | 3b — Extract frames + audio | `extract_frames.py` | `temp/frames/`, `temp/audio/` |
 | 3c — Transcribe | `transcribe_audio.py` | `temp/transcripts/` |
 | 3d — Analyze | `post-analyzer` sub-agents + `merge_analyses.py` | `temp/analyses.json` |
-| 4 — Report | `generate_report.py` | `output/reports/IG-Competitor-Research_{date}.html` **+ `.pdf`** |
+| 4 — Report | `generate_report.py` | `output/reports/IG-Competitor-Research_{date}_{HHMM}.html` **+ `.pdf`** (run-versioned, never overwrites) |
 
 Phase 3d is done by Claude sub-agents in-conversation (vision over the extracted
 frames) — not an API call — so there's no extra LLM cost beyond your Claude session.
