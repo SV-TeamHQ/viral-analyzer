@@ -67,6 +67,11 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/rank_and_select.py" \
   --output "${CLAUDE_PROJECT_DIR}/temp/selected_posts.json" \
   --top-per-handle 10
 ```
+Selects up to **10 posts per handle** and re-ranks by outlier score. `--top-per-handle`
+is a *ceiling* — if `temp/raw_posts.json` contains fewer than 10 posts for a handle (i.e.
+Phase 1 scraped fewer), fewer are selected. If the report comes back light, **re-run from
+Phase 1** and/or raise `posts_per_handle` in `config/competitors.json` — do not just bump
+this flag, it cannot add posts that were never scraped.
 
 ### Phase 3a — Download Media ✅
 ```bash
