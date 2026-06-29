@@ -105,7 +105,8 @@ class TestScrape:
         mock_client.actor.return_value.call.return_value = run
         mock_client.dataset.return_value = mock_dataset
 
-        handles = [{"handle": "competitor1", "niche": "AI tools"}]
+        handles = [{"handle": "competitor1", "niche": "AI tools"},
+                   {"handle": "competitor2", "niche": "AI tools"}]
         with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
             result = scrape(handles, posts_per_handle=10, lookback_days=7)
 
@@ -141,6 +142,64 @@ class TestScrape:
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(ValueError):
                 scrape([{"handle": "x"}], posts_per_handle=10, lookback_days=7)
+
+    @patch("scripts.scrape_instagram.ApifyClient")
+    def test_scrape_drops_posts_from_other_handles(self, mock_client_class):
+        # the actor returns a collab/related post from a different user
+        leaked = {
+            **SAMPLE_VIDEO_POST,
+            "code": "LEAK1",
+            "user": {"username": "atlasberry008"},
+        }
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_dataset = MagicMock()
+        mock_dataset.iterate_items.return_value = [SAMPLE_VIDEO_POST, leaked]
+        run = MagicMock()
+        run.default_dataset_id = "ds123"
+        mock_client.actor.return_value.call.return_value = run
+        mock_client.dataset.return_value = mock_dataset
+
+        handles = [{"handle": "competitor1"}]  # only competitor1 requested
+        with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
+            result = scrape(handles, posts_per_handle=10, lookback_days=365)
+
+        result_handles = {p["handle"] for p in result}
+        assert "atlasberry008" not in result_handles
+        assert result_handles == {"competitor1"}
+
+    @patch("scripts.scrape_instagram.ApifyClient")
+    def test_scrape_handle_filter_is_case_insensitive(self, mock_client_class):
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_dataset = MagicMock()
+        mock_dataset.iterate_items.return_value = [SAMPLE_VIDEO_POST]  # user: competitor1
+        run = MagicMock()
+        run.default_dataset_id = "ds123"
+        mock_client.actor.return_value.call.return_value = run
+        mock_client.dataset.return_value = mock_dataset
+
+        with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
+            result = scrape([{"handle": "Competitor1"}], posts_per_handle=10, lookback_days=365)
+        assert len(result) == 1 and result[0]["handle"] == "competitor1"
+
+    @patch("scripts.scrape_instagram.ApifyClient")
+    def test_scrape_overfetches_results_limit(self, mock_client_class):
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_dataset = MagicMock()
+        mock_dataset.iterate_items.return_value = []
+        run = MagicMock()
+        run.default_dataset_id = "ds123"
+        mock_client.actor.return_value.call.return_value = run
+        mock_client.dataset.return_value = mock_dataset
+
+        with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
+            scrape([{"handle": "competitor1"}], posts_per_handle=10, lookback_days=365)
+
+        run_input = mock_client.actor.return_value.call.call_args.kwargs["run_input"]
+        # over-fetch so handle filtering doesn't starve the count
+        assert run_input["resultsLimit"] >= 20
 
 
 class TestEnvPathFor:

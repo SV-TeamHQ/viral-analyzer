@@ -89,7 +89,10 @@ def scrape(handles: list[dict], posts_per_handle: int, lookback_days: int) -> li
     urls = [f"https://www.instagram.com/{h['handle']}/" for h in handles]
     run_input = {
         "urls": urls,
-        "resultsLimit": posts_per_handle,
+        # Over-fetch: the actor often returns collab/related posts from other
+        # handles, which we filter out below. Headroom keeps the requested
+        # handle's count from being starved.
+        "resultsLimit": posts_per_handle * 2,
     }
 
     run = client.actor(ACTOR_ID).call(run_input=run_input)
@@ -97,6 +100,12 @@ def scrape(handles: list[dict], posts_per_handle: int, lookback_days: int) -> li
     items = list(client.dataset(dataset_id).iterate_items())
 
     posts = [normalize_post(item) for item in items]
+
+    # The actor can return posts from other users (collabs, related, reposts).
+    # Keep only posts from the handles we actually requested.
+    requested = {h["handle"].strip().lower() for h in handles}
+    posts = [p for p in posts if p["handle"].lower() in requested]
+
     return filter_recent_posts(posts, lookback_days)
 
 

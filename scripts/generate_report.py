@@ -72,7 +72,13 @@ def generate_report(input_path: str, output_dir: str, summary_path: str | None =
     print(f"Wrote report -> {out_path}")
 
     if pdf:
-        from scripts.generate_pdf import render_pdf
+        # Dual import: works both as a package (pytest / `python -m`) and when this
+        # script is run standalone (e.g. `python …/scripts/generate_report.py`), where
+        # only this file's directory is on sys.path.
+        try:
+            from scripts.generate_pdf import render_pdf
+        except ModuleNotFoundError:
+            from generate_pdf import render_pdf
         pdf_path = os.path.join(output_dir, f"IG-Competitor-Research_{date_str}.pdf")
         if render_pdf(out_path, pdf_path):
             print(f"Wrote PDF -> {pdf_path}")
