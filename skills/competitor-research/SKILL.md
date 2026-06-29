@@ -55,6 +55,10 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_instagram.py" \
   --config "${CLAUDE_PROJECT_DIR}/config/competitors.json" \
   --output "${CLAUDE_PROJECT_DIR}/temp/raw_posts.json"
 ```
+Scrapes recent posts for each handle via Apify's **`api-ninja/instagram-scraper`**
+(uses Instagram's private API — reliable; do **not** swap to `apify/instagram-scraper`,
+which is blocked on post-detail requests). Default lookback is **365 days** in the
+template; most accounts don't post weekly, so a 7-day window often returns 0 posts.
 
 ### Phase 2 — Rank & Select ✅
 ```bash

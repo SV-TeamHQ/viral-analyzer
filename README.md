@@ -160,7 +160,7 @@ that copy** with real handles:
     { "handle": "real_handle_2", "niche": "AI tools" }
   ],
   "posts_per_handle": 10,
-  "lookback_days": 7
+  "lookback_days": 365
 }
 ```
 
