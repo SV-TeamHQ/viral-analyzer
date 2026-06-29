@@ -44,6 +44,30 @@
       text-decoration: none; font-weight: 600; }
     .link:hover { text-decoration: underline; }
     .placeholder { color: var(--dim); font-style: italic; }
+
+    /* Print / PDF: light theme (Chromium's page.pdf renders with print media).
+       Screen viewing keeps the dark theme above. */
+    @media print {
+      :root {
+        --bg: #ffffff;
+        --card: #f7f8fa;
+        --ink: #1a1d24;
+        --dim: #555c66;
+        --line: #d9dde3;
+        --accent: #b3245f;
+        --accent2: #6f2e8a;
+      }
+      body { background: #ffffff; }
+      .wrap { padding: 0; }
+      /* the gradient/transparent h1 doesn't render reliably in print — use a solid tone */
+      h1 {
+        background: none;
+        -webkit-text-fill-color: #b3245f;
+        color: #b3245f;
+      }
+      .hook { color: #2a2e37; }          /* override the light-on-dark hook text */
+      .card { break-inside: avoid; }      /* don't split a card across PDF pages */
+    }
   </style>
 </head>
 <body>

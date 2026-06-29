@@ -37,7 +37,7 @@ class TestRenderPdf:
         # loaded the HTML via a file:// URI
         goto_url = page.goto.call_args.args[0]
         assert goto_url.startswith("file://")
-        # print backgrounds so the dark theme renders faithfully
+        # print backgrounds so the (light, print-theme) card fills render
         assert page.pdf.call_args.kwargs.get("print_background") is True
         assert page.pdf.call_args.kwargs.get("path") == str(out_path)
 

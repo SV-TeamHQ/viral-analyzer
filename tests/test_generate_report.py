@@ -50,6 +50,13 @@ class TestRenderReport:
         assert "2026-06-26" in html
         assert "hook1" in html
 
+    def test_includes_light_print_stylesheet_for_pdf(self):
+        html = render_report(ANALYSES, "S", "2026-06-26", "templates/report.html.j2")
+        assert "@media print" in html
+        # light theme overrides for the PDF (print media), not the dark screen theme
+        assert "#ffffff" in html
+        assert "break-inside: avoid" in html
+
 
 class TestGenerateReport:
     def test_writes_dated_html_file(self, tmp_path):
