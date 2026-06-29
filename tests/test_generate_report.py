@@ -61,3 +61,30 @@ class TestGenerateReport:
         assert path.endswith("IG-Competitor-Research_2026-06-26.html")
         assert os.path.exists(path)
         assert "creator1" in open(path, encoding="utf-8").read()
+
+    def test_pdf_flag_invokes_render_pdf(self, tmp_path, monkeypatch):
+        analyses_file = tmp_path / "analyses.json"
+        analyses_file.write_text(json.dumps(ANALYSES))
+        called = {}
+
+        def fake_render(html, pdf):
+            called["html"] = html
+            called["pdf"] = pdf
+            return pdf
+        monkeypatch.setattr("scripts.generate_pdf.render_pdf", fake_render)
+
+        generate_report(str(analyses_file), str(tmp_path / "reports"), summary_path=None,
+                        date_str="2026-06-29", pdf=True)
+        assert called["html"].endswith("IG-Competitor-Research_2026-06-29.html")
+        assert called["pdf"].endswith("IG-Competitor-Research_2026-06-29.pdf")
+
+    def test_pdf_off_does_not_invoke_render_pdf(self, tmp_path, monkeypatch):
+        analyses_file = tmp_path / "analyses.json"
+        analyses_file.write_text(json.dumps(ANALYSES))
+
+        def boom(html, pdf):
+            raise AssertionError("render_pdf should not be called when pdf=False")
+        monkeypatch.setattr("scripts.generate_pdf.render_pdf", boom)
+
+        generate_report(str(analyses_file), str(tmp_path / "reports"), summary_path=None,
+                        date_str="2026-06-29", pdf=False)

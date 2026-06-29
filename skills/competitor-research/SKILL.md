@@ -65,7 +65,7 @@ template; most accounts don't post weekly, so a 7-day window often returns 0 pos
 python "${CLAUDE_PLUGIN_ROOT}/scripts/rank_and_select.py" \
   --input "${CLAUDE_PROJECT_DIR}/temp/raw_posts.json" \
   --output "${CLAUDE_PROJECT_DIR}/temp/selected_posts.json" \
-  --top-per-handle 3
+  --top-per-handle 10
 ```
 
 ### Phase 3a — Download Media ✅
@@ -101,8 +101,9 @@ extracted frames). This is orchestration, not a single script:
 1. Read `${CLAUDE_PROJECT_DIR}/temp/selected_posts.json` (fully enriched with `frames`,
    `transcript`, `hook`, metrics).
 2. **Fan out** the `post-analyzer` sub-agent (see `agents/post-analyzer.md`) — spawn up to
-   **5 in parallel per batch** via the Agent tool, ~15 posts = 3 sequential batches. Wait
-   for each batch to finish before spawning the next.
+   **5 in parallel per batch** via the Agent tool (e.g. 50 posts = 10 sequential batches,
+   since Phase 2 selects up to 10 per handle). Wait for each batch to finish before
+   spawning the next.
 3. Each sub-agent reads its post's frame JPEGs (vision) + transcript + metrics and writes
    `${CLAUDE_PROJECT_DIR}/temp/analyses/{id}.json`.
 4. Merge the per-post files (re-applies ground-truth metrics; placeholders for gaps):
@@ -124,8 +125,14 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/generate_report.py" \
   --summary "${CLAUDE_PROJECT_DIR}/temp/niche_summary.txt"
 ```
 The `--summary` file is optional: if absent (or `--summary ""`), the report uses a
-data-driven fallback summary. The HTML report (with base64-embedded frame thumbnails)
-is written to `${CLAUDE_PROJECT_DIR}/output/reports/IG-Competitor-Research_{date}.html`.
+data-driven fallback summary. The HTML report (full frame images rendered with
+`object-fit: contain`) is written to `${CLAUDE_PROJECT_DIR}/output/reports/IG-Competitor-Research_{date}.html`.
+
+By default a **PDF** is also rendered from that HTML (`--pdf`, disable with `--no-pdf`)
+into `IG-Competitor-Research_{date}.pdf` via headless Chromium. Requires Playwright:
+`pip install playwright && playwright install chromium`. If Playwright isn't installed,
+the PDF step is skipped (non-fatal) and the HTML is still produced. To render a PDF from
+an existing HTML file directly: `python "${CLAUDE_PLUGIN_ROOT}/scripts/generate_pdf.py" --html <report.html>`.
 
 ## Orchestration
 

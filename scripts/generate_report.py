@@ -52,7 +52,7 @@ def render_report(analyses: list[dict], summary: str, date_str: str, template_pa
 
 
 def generate_report(input_path: str, output_dir: str, summary_path: str | None = None,
-                    date_str: str | None = None) -> str:
+                    date_str: str | None = None, pdf: bool = False) -> str:
     with open(input_path, encoding="utf-8") as f:
         analyses = json.load(f)
 
@@ -70,6 +70,13 @@ def generate_report(input_path: str, output_dir: str, summary_path: str | None =
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"Wrote report -> {out_path}")
+
+    if pdf:
+        from scripts.generate_pdf import render_pdf
+        pdf_path = os.path.join(output_dir, f"IG-Competitor-Research_{date_str}.pdf")
+        if render_pdf(out_path, pdf_path):
+            print(f"Wrote PDF -> {pdf_path}")
+
     return out_path
 
 
@@ -78,8 +85,11 @@ if __name__ == "__main__":
     parser.add_argument("--input", default="temp/analyses.json")
     parser.add_argument("--output-dir", default="output/reports")
     parser.add_argument("--summary", default="temp/niche_summary.txt")
+    parser.add_argument("--pdf", action=argparse.BooleanOptionalAction, default=True,
+                        help="also render a PDF from the HTML (requires Playwright)")
     args = parser.parse_args()
     generate_report(
         args.input, args.output_dir,
         summary_path=args.summary if args.summary else None,
+        pdf=args.pdf,
     )

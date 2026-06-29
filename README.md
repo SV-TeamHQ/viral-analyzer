@@ -17,12 +17,12 @@ or natural language like *"research my Instagram competitors."*
 | Phase | Script | Output |
 |-------|--------|--------|
 | 1 — Scrape | `scrape_instagram.py` | `temp/raw_posts.json` |
-| 2 — Rank & Select | `rank_and_select.py` | `temp/selected_posts.json` |
+| 2 — Rank & Select | `rank_and_select.py` | `temp/selected_posts.json` (top **10 per handle**) |
 | 3a — Download media | `download_media.py` | `temp/media/` |
 | 3b — Extract frames + audio | `extract_frames.py` | `temp/frames/`, `temp/audio/` |
 | 3c — Transcribe | `transcribe_audio.py` | `temp/transcripts/` |
 | 3d — Analyze | `post-analyzer` sub-agents + `merge_analyses.py` | `temp/analyses.json` |
-| 4 — Report | `generate_report.py` | `output/reports/IG-Competitor-Research_{date}.html` |
+| 4 — Report | `generate_report.py` | `output/reports/IG-Competitor-Research_{date}.html` **+ `.pdf`** |
 
 Phase 3d is done by Claude sub-agents in-conversation (vision over the extracted
 frames) — not an API call — so there's no extra LLM cost beyond your Claude session.
@@ -65,6 +65,7 @@ What you get and why:
 | `openai-whisper` | local speech-to-text transcription (**pulls in PyTorch ~2 GB**) | 3c |
 | `jinja2` | render the HTML report | 4 |
 | `Pillow` | image handling | 4 |
+| `playwright` | render the HTML report → PDF via headless Chromium | 4 |
 | `pytest` | run the test suite (dev only) | — |
 
 > **Heavy dep note:** `openai-whisper` transitively installs **PyTorch (~2 GB)**. The
@@ -76,6 +77,13 @@ What you get and why:
 > ```
 > Whisper also needs a CUDA-capable GPU for best speed but runs on CPU (slower). On first
 > run it downloads the `base` model (~74 MB) automatically.
+>
+> **PDF dep note:** `playwright` (Phase 4 PDF) is optional — if it's not installed the
+> pipeline still produces the HTML report and just skips the PDF. To enable PDFs, after
+> `pip install -r requirements.txt` also download the browser once:
+> ```bash
+> playwright install chromium    # one-time ~150 MB download
+> ```
 
 ### 3. Accounts & secrets
 
@@ -179,7 +187,7 @@ directory** (`${CLAUDE_PROJECT_DIR}`), not inside the plugin (the plugin's insta
 directory is ephemeral and replaced on update):
 
 - `temp/` — downloads, frames, audio, transcripts, per-post analyses (scratch; recreated each run)
-- `output/reports/` — the final HTML reports (kept)
+- `output/reports/` — the final HTML **and PDF** reports (kept)
 
 Both are gitignored in this repo.
 

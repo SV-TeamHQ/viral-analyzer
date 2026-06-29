@@ -10,7 +10,7 @@ def calculate_outlier_score(post_engagement: int, account_median: float) -> floa
     return round(post_engagement / account_median, 2)
 
 
-def rank_and_select(posts: list[dict], top_per_handle: int) -> list[dict]:
+def rank_and_select(posts: list[dict], top_per_handle: int = 10) -> list[dict]:
     by_handle: dict[str, list[dict]] = {}
     for post in posts:
         by_handle.setdefault(post["handle"], []).append(post)
@@ -56,6 +56,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Rank and select top posts")
     parser.add_argument("--input", default="temp/raw_posts.json")
     parser.add_argument("--output", default="temp/selected_posts.json")
-    parser.add_argument("--top-per-handle", type=int, default=3)
+    parser.add_argument("--top-per-handle", type=int, default=10)
     args = parser.parse_args()
     main(args.input, args.output, args.top_per_handle)
