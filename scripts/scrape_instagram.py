@@ -2,17 +2,13 @@ import argparse
 import json
 import os
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
-try:
-    from apify_client import ApifyClient
-except ImportError:
-    ApifyClient = None
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    load_dotenv = None
+from viral_core.apify_client import run_actor
+from viral_core.config_io import load_env
 
 
 # The actor used for scraping. NOTE: `apify/instagram-scraper` (web GraphQL) is
@@ -84,8 +80,6 @@ def scrape(handles: list[dict], posts_per_handle: int, lookback_days: int) -> li
     if not token:
         raise ValueError("APIFY_TOKEN environment variable is not set")
 
-    client = ApifyClient(token)
-
     urls = [f"https://www.instagram.com/{h['handle']}/" for h in handles]
     run_input = {
         "urls": urls,
@@ -95,10 +89,7 @@ def scrape(handles: list[dict], posts_per_handle: int, lookback_days: int) -> li
         "resultsLimit": posts_per_handle * 2,
     }
 
-    run = client.actor(ACTOR_ID).call(run_input=run_input)
-    dataset_id = run.default_dataset_id
-    items = list(client.dataset(dataset_id).iterate_items())
-
+    items = run_actor(token, ACTOR_ID, run_input)
     posts = [normalize_post(item) for item in items]
 
     # The actor can return posts from other users (collabs, related, reposts).
@@ -109,21 +100,9 @@ def scrape(handles: list[dict], posts_per_handle: int, lookback_days: int) -> li
     return filter_recent_posts(posts, lookback_days)
 
 
-def _env_path_for(config_path: str) -> Path:
-    """Derive the project-root .env from the config path.
-
-    The standard layout is <project>/config/competitors.json, so the project root is
-    the config file's grandparent. This lets the script find .env regardless of CWD
-    when run as a plugin.
-    """
-    return Path(config_path).resolve().parent.parent / ".env"
-
-
 def main(config_path: str, output_path: str) -> None:
-    # Load .env from the project root (derived from --config), then fall back to CWD.
-    if load_dotenv is not None:
-        load_dotenv(_env_path_for(config_path))
-        load_dotenv()
+    project_dir = str(pathlib.Path(config_path).resolve().parent.parent)
+    load_env(project_dir)
 
     with open(config_path) as f:
         config = json.load(f)
