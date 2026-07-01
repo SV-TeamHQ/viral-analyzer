@@ -20,6 +20,7 @@ pytestmark = pytest.mark.skipif(not TOKEN, reason="needs APIFY_TOKEN (live Apify
 
 HASHTAG_ACTOR = "api-ninja/instagram-scraper"
 PROFILE_ACTOR = "apify/instagram-profile-scraper"
+ANALYTICS_ACTOR = "apify/instagram-hashtag-analytics-scraper"
 HASHTAG_URL = "https://www.instagram.com/explore/tags/aitools/"
 
 
@@ -44,3 +45,15 @@ def test_profile_scrape_returns_followers_latestposts_username():
     assert "followersCount" in p, f"no followersCount — shape drift? keys: {list(p.keys())}"
     assert "latestPosts" in p, f"no latestPosts — shape drift? keys: {list(p.keys())}"
     assert p.get("username"), "profile did not resolve owner.id to a username"
+
+
+def test_analytics_actor_returns_posts_count_and_related():
+    # The hashtag-volume research step depends on this aggregate shape.
+    items = run_actor(TOKEN, ANALYTICS_ACTOR, {"hashtags": ["aitools"]})
+    assert items, "analytics actor returned no items"
+    rec = items[0]
+    assert "postsCount" in rec, f"no postsCount — shape drift? keys: {list(rec.keys())}"
+    related = rec.get("related") or []
+    assert related, f"no related hashtags — shape drift? sample: {rec}"
+    assert related[0].get("hash"), "related entry missing 'hash' field"
+    assert related[0].get("info"), "related entry missing 'info' (volume) field"

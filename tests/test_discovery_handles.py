@@ -49,3 +49,18 @@ def test_discover_handles_uses_explore_tags_urls(monkeypatch):
         assert all("explore/tags/" in u for u in r["urls"])
     handles = {h["handle"] for h in out}
     assert {"111", "222"} <= handles
+
+def test_discover_handles_honors_explicit_hashtags_override(monkeypatch):
+    # When the user confirms a hashtag set via research, those (and only those)
+    # are scraped — per-niche generation is bypassed.
+    scraped_tags = []
+    def fake_run(token, actor, run_input):
+        scraped_tags.append(run_input["urls"][0])
+        return [{"owner": {"id": "999"}}]
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_handles.run_actor", side_effect=fake_run):
+        out = discover_handles(["ignored niche"], "tok",
+                               hashtags=["#aitools", "#chatgpt"])
+    assert len(scraped_tags) == 2
+    assert all("aitools" in t or "chatgpt" in t for t in scraped_tags)
+    assert any(h["handle"] == "999" for h in out)
