@@ -6,3 +6,6 @@ output/
 *.egg-info/
 dist/
 build/
+
+# Superpowers brainstorming mockups + local SDD docs (not part of the shipped plugin)
+.superpowers/
