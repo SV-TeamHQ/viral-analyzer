@@ -1,0 +1,12 @@
+[
+  {
+    "handle": "a",
+    "hashtags": ["#ai", "#video"],
+    "post_count": 2
+  },
+  {
+    "handle": "b",
+    "hashtags": ["#ai"],
+    "post_count": 1
+  }
+]
