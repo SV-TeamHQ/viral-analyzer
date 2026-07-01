@@ -117,7 +117,7 @@ def generate_report(input_path: str, output_dir: str, summary_path: str | None =
             ok = False
         if ok:
             print(f"Wrote PDF -> {pdf_path}")
-            pdf_name = os.path.basename(pdf_path)
+            pdf_name = pdf_path
 
     # Durable handoff artifact for downstream stages.
     research = {

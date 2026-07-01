@@ -64,6 +64,7 @@ def merge_niches(trends: list[tuple[str, int]], reddit: list[tuple[str, int]]) -
     out = []
     for v in seen.values():
         v["trend_score"] = round(100 * v["raw"] / max_score)
+        del v["raw"]
         out.append(v)
     out.sort(key=lambda d: (len(d["sources"]), d["trend_score"]), reverse=True)
     return out
