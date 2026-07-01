@@ -8,6 +8,7 @@ from statistics import median
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from viral_core.apify_client import run_actor
+from viral_core.config_io import load_env
 from viral_core.scoring import outlier_score
 
 PROFILE_ACTOR = "apify/instagram-profile-scraper"
@@ -56,12 +57,27 @@ def _eng_abs(c: dict) -> int | float:
     return c.get("avg_likes", 0) + c.get("avg_comments", 0)
 
 
-def score_handles(candidates: list[dict], token: str, top_n: int = 10) -> list[dict]:
+def _avg_engagement(prof: dict) -> tuple[float, float]:
+    """Issue 7: apify/instagram-profile-scraper has no top-level avg fields.
+    Compute avg likes/comments from its `latestPosts` array."""
+    latest = prof.get("latestPosts") or []
+    if not latest:
+        return 0.0, 0.0
+    n = len(latest)
+    avg_likes = sum(p.get("likesCount", 0) for p in latest) / n
+    avg_comments = sum(p.get("commentsCount", 0) for p in latest) / n
+    return avg_likes, avg_comments
+
+
+def score_handles(candidates: list[dict], token: str, top_n: int = 10,
+                  min_followers: int = 1000) -> list[dict]:
     max_tags = max((len(c.get("hashtags", [])) for c in candidates), default=1) or 1
 
     # ----- Pass 1: enrich every candidate via profile scrape -----
-    # Real Phase B candidates have NO followers/avg_likes yet, so cohort
+    # Real Phase B candidates have NO followers/engagement yet, so cohort
     # statistics MUST be computed from scraped data, not pre-scrape zeros.
+    # `handle` arrives as an Instagram owner.id; the profile scraper resolves
+    # it to a username, which we emit so competitors.json stays username-based.
     enriched: list[dict] = []
     for c in candidates:
         run_input = {"usernames": [c["handle"]]}
@@ -74,8 +90,13 @@ def score_handles(candidates: list[dict], token: str, top_n: int = 10) -> list[d
             continue
         prof = items[0]
         c["followers"] = prof.get("followersCount", 0) or 0
-        c["avg_likes"] = prof.get("avgLikes", 0) or 0
-        c["avg_comments"] = prof.get("avgComments", 0) or 0
+        c["avg_likes"], c["avg_comments"] = _avg_engagement(prof)
+        # Issue 9: drop tiny accounts before they pollute cohort stats / scoring.
+        if c["followers"] < min_followers:
+            continue
+        username = prof.get("username")
+        if username:
+            c["handle"] = username  # resolve owner.id -> username
         enriched.append(c)
 
     if not enriched:
@@ -104,13 +125,16 @@ def score_handles(candidates: list[dict], token: str, top_n: int = 10) -> list[d
     return scored[:top_n]
 
 
-def main(input_path: str, output_path: str, top_n: int) -> None:
+def main(input_path: str, output_path: str, top_n: int, min_followers: int = 1000) -> None:
+    # Issue 8: load .env from the project root (output is <root>/temp/X.json).
+    project_dir = str(pathlib.Path(output_path).resolve().parent.parent)
+    load_env(project_dir)
     token = os.environ.get("APIFY_TOKEN")
     if not token:
         raise RuntimeError("APIFY_TOKEN not set")
     with open(input_path) as f:
         candidates = json.load(f)
-    scored = score_handles(candidates, token, top_n)
+    scored = score_handles(candidates, token, top_n, min_followers=min_followers)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(scored, f, indent=2)
@@ -122,5 +146,7 @@ if __name__ == "__main__":
     parser.add_argument("--input", default="temp/candidate_handles.json")
     parser.add_argument("--output", default="temp/scored_handles.json")
     parser.add_argument("--top-n", type=int, default=10)
+    parser.add_argument("--min-followers", type=int, default=1000,
+                        help="drop candidates below this follower count (Issue 9)")
     args = parser.parse_args()
-    main(args.input, args.output, args.top_n)
+    main(args.input, args.output, args.top_n, min_followers=args.min_followers)
