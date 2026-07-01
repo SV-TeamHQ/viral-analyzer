@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import pathlib
+from statistics import median
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from viral_core.apify_client import run_actor
@@ -44,21 +45,25 @@ def compute_final_score(c: dict, max_tags: int, median_engagement: float,
     }
 
 
+def _eng_rate(c: dict) -> float:
+    """Engagement RATE for a candidate (avg interactions per follower)."""
+    followers = c.get("followers") or 1
+    return (c.get("avg_likes", 0) + c.get("avg_comments", 0)) / followers
+
+
+def _eng_abs(c: dict) -> int | float:
+    """Absolute engagement count (avg likes + comments) for a candidate."""
+    return c.get("avg_likes", 0) + c.get("avg_comments", 0)
+
+
 def score_handles(candidates: list[dict], token: str, top_n: int = 10) -> list[dict]:
     max_tags = max((len(c.get("hashtags", [])) for c in candidates), default=1) or 1
-    # rough cohort engagement for the 80th-percentile threshold + a median baseline
-    eng_rates = []
-    for c in candidates:
-        f = c.get("followers") or 1
-        eng_rates.append((c.get("avg_likes", 0) + c.get("avg_comments", 0)) / f)
-    eng_rates.sort()
-    top20 = eng_rates[-max(1, len(eng_rates) // 5)] if eng_rates else 1.0
-    median_eng = eng_rates[len(eng_rates) // 2] if eng_rates else 0.0
 
-    scored = []
+    # ----- Pass 1: enrich every candidate via profile scrape -----
+    # Real Phase B candidates have NO followers/avg_likes yet, so cohort
+    # statistics MUST be computed from scraped data, not pre-scrape zeros.
+    enriched: list[dict] = []
     for c in candidates:
-        if not qualifies(c, min_tags=2, top20_eng_rate=top20):
-            continue
         run_input = {"usernames": [c["handle"]]}
         try:
             items = run_actor(token, PROFILE_ACTOR, run_input)
@@ -68,11 +73,31 @@ def score_handles(candidates: list[dict], token: str, top_n: int = 10) -> list[d
         if not items:
             continue
         prof = items[0]
-        c["followers"] = prof.get("followersCount", 0)
-        c["avg_likes"] = prof.get("avgLikes", 0)
-        c["avg_comments"] = prof.get("avgComments", 0)
-        final, parts = compute_final_score(c, max_tags, median_eng * c["followers"],
-                                           sample_top_engagement=c["avg_likes"] + c["avg_comments"])
+        c["followers"] = prof.get("followersCount", 0) or 0
+        c["avg_likes"] = prof.get("avgLikes", 0) or 0
+        c["avg_comments"] = prof.get("avgComments", 0) or 0
+        enriched.append(c)
+
+    if not enriched:
+        return []
+
+    # ----- Cohort statistics from REAL scraped data -----
+    # median_abs: median absolute engagement count across the cohort.
+    median_abs = median(_eng_abs(c) for c in enriched)
+    # top20_rate: engagement RATE at the 80th percentile (upper quintile) —
+    # the gate above which a creator qualifies on engagement alone.
+    rates_sorted = sorted(_eng_rate(c) for c in enriched)
+    top20_idx = max(1, len(rates_sorted) - max(1, len(rates_sorted) // 5))
+    top20_rate = rates_sorted[top20_idx - 1] if rates_sorted else 1.0
+
+    # ----- Pass 2: qualify + score against the real cohort baseline -----
+    scored = []
+    for c in enriched:
+        if not qualifies(c, min_tags=2, top20_eng_rate=top20_rate):
+            continue
+        sample_top = _eng_abs(c)
+        final, parts = compute_final_score(c, max_tags, median_abs,
+                                           sample_top_engagement=sample_top)
         scored.append({"handle": c["handle"], "niche": c.get("niche", ""),
                        "final_score": final, **parts})
     scored.sort(key=lambda d: d["final_score"], reverse=True)
