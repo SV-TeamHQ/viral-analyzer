@@ -1,0 +1,73 @@
+{
+  "summary": "Across this six-post cohort the dominant play is the contrarian claim, used in half the analyzed posts and carried by three different creators, almost always in service of a cost-reduction narrative about AI replacing paid tools or headcount. The format mix skews heavily toward the talking head (three of six), which lets creators sell conviction on polarizing takes, while screen recordings (two of six) anchor the curiosity-gap posts that drive saves with copyable prompts and hidden settings. Recurring topics cluster tightly around cost-reduction and workflow speed, with tool comparison appearing once as a carousel. The cohort is small and somewhat sparse, so treat these shares as directional rather than definitive, but the consistency of the contrarian-plus-cost-reduction pairing across handles is a real signal.",
+  "hook_types": [
+    {
+      "name": "Contrarian claim",
+      "definition": "An opener that states a polarizing, debatable position to force a reaction from viewers who either agree or feel compelled to argue.",
+      "count": 3,
+      "share": 0.5,
+      "examples": [
+        {
+          "post_id": "C1",
+          "handle": "mrwhosetheboss",
+          "execution": "States the contrarian cost claim straight to camera in the first three seconds, naming his whole video team, which sells conviction and personal stakes.",
+          "outlier_score": 8.4
+        },
+        {
+          "post_id": "C2",
+          "handle": "aiexplained",
+          "execution": "Issues a two-word imperative, 'Stop paying for Premiere,' that names the incumbent tool everyone already pays for, instantly splitting the audience.",
+          "outlier_score": 6.1
+        },
+        {
+          "post_id": "C4",
+          "handle": "techled",
+          "execution": "Leads with a livelihood threat, 'Editors are about to lose their jobs,' then frames the rest of the reel as data nobody wants to look at to sustain watch-time.",
+          "outlier_score": 5.3
+        }
+      ]
+    },
+    {
+      "name": "Curiosity gap",
+      "definition": "An opener that implies withheld or insider knowledge the viewer does not yet have, creating an itch that can only be scratched by watching.",
+      "count": 2,
+      "share": 0.33,
+      "examples": [
+        {
+          "post_id": "C3",
+          "handle": "aiexplained",
+          "execution": "Teases 'the prompt nobody is sharing' on screen, pairing the gap with a save-bait caption so viewers save the post expecting to copy the prompt later.",
+          "outlier_score": 4.7
+        },
+        {
+          "post_id": "C5",
+          "handle": "mrwhosetheboss",
+          "execution": "Promises 'the one setting that fixes everything,' framing it as something the viewer has had off the whole time to maximize the curiosity itch.",
+          "outlier_score": 4.2
+        }
+      ]
+    }
+  ],
+  "formats": [
+    {
+      "name": "Talking head",
+      "count": 3,
+      "share": 0.5
+    },
+    {
+      "name": "Screen recording",
+      "count": 2,
+      "share": 0.33
+    },
+    {
+      "name": "Carousel",
+      "count": 1,
+      "share": 0.17
+    }
+  ],
+  "topics": [
+    "cost-reduction",
+    "workflow speed",
+    "tool comparison"
+  ]
+}

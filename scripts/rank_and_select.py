@@ -3,11 +3,14 @@ import json
 import os
 from statistics import median
 
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-def calculate_outlier_score(post_engagement: int, account_median: float) -> float:
-    if account_median == 0:
-        return 0.0
-    return round(post_engagement / account_median, 2)
+from viral_core.scoring import outlier_score
+
+# Backward-compat alias: existing tests import `calculate_outlier_score`.
+calculate_outlier_score = outlier_score
 
 
 def rank_and_select(posts: list[dict], top_per_handle: int = 10) -> list[dict]:

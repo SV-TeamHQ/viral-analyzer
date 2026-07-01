@@ -1,0 +1,5 @@
+[
+  { "niche": "AI video editors", "trend_score": 87, "sources": ["google_trends", "reddit"] },
+  { "niche": "AI coding assistants", "trend_score": 74, "sources": ["google_trends"] },
+  { "niche": "Notion templates", "trend_score": 61, "sources": ["reddit"] }
+]

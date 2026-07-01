@@ -1,9 +1,9 @@
 import os
 from datetime import datetime, timezone, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pytest
 
-from scripts.scrape_instagram import scrape, normalize_post, filter_recent_posts, _env_path_for
+from scripts.scrape_instagram import scrape, normalize_post, filter_recent_posts
 
 
 # Fixtures use the api-ninja/instagram-scraper schema (Instagram private API).
@@ -94,16 +94,9 @@ class TestFilterRecentPosts:
 
 
 class TestScrape:
-    @patch("scripts.scrape_instagram.ApifyClient")
-    def test_scrape_uses_api_ninja_actor_and_normalizes(self, mock_client_class):
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_dataset = MagicMock()
-        mock_dataset.iterate_items.return_value = [SAMPLE_VIDEO_POST, SAMPLE_IMAGE_POST]
-        run = MagicMock()
-        run.default_dataset_id = "ds123"
-        mock_client.actor.return_value.call.return_value = run
-        mock_client.dataset.return_value = mock_dataset
+    @patch("scripts.scrape_instagram.run_actor")
+    def test_scrape_uses_api_ninja_actor_and_normalizes(self, mock_run_actor):
+        mock_run_actor.return_value = [SAMPLE_VIDEO_POST, SAMPLE_IMAGE_POST]
 
         handles = [{"handle": "competitor1", "niche": "AI tools"},
                    {"handle": "competitor2", "niche": "AI tools"}]
@@ -113,23 +106,17 @@ class TestScrape:
         assert len(result) == 2
         assert result[0]["platform"] == "instagram"
         assert result[0]["id"] == "ABC123"
-        mock_client.actor.assert_called_once_with("api-ninja/instagram-scraper")
-        mock_client.dataset.assert_called_once_with("ds123")  # uses run.default_dataset_id
+        # run_actor is called with (token, actor_id, run_input) positionally
+        args, _ = mock_run_actor.call_args
+        assert args[1] == "api-ninja/instagram-scraper"
         # input format: urls + resultsLimit (no directUrls/resultsType/searchType)
-        run_input = mock_client.actor.return_value.call.call_args.kwargs["run_input"]
+        run_input = args[2]
         assert "urls" in run_input and "resultsLimit" in run_input
         assert "directUrls" not in run_input
 
-    @patch("scripts.scrape_instagram.ApifyClient")
-    def test_scrape_filters_old_posts(self, mock_client_class):
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_dataset = MagicMock()
-        mock_dataset.iterate_items.return_value = [SAMPLE_VIDEO_POST, OLD_POST]
-        run = MagicMock()
-        run.default_dataset_id = "ds123"
-        mock_client.actor.return_value.call.return_value = run
-        mock_client.dataset.return_value = mock_dataset
+    @patch("scripts.scrape_instagram.run_actor")
+    def test_scrape_filters_old_posts(self, mock_run_actor):
+        mock_run_actor.return_value = [SAMPLE_VIDEO_POST, OLD_POST]
 
         handles = [{"handle": "competitor1", "niche": "AI tools"}]
         with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
@@ -143,22 +130,15 @@ class TestScrape:
             with pytest.raises(ValueError):
                 scrape([{"handle": "x"}], posts_per_handle=10, lookback_days=7)
 
-    @patch("scripts.scrape_instagram.ApifyClient")
-    def test_scrape_drops_posts_from_other_handles(self, mock_client_class):
+    @patch("scripts.scrape_instagram.run_actor")
+    def test_scrape_drops_posts_from_other_handles(self, mock_run_actor):
         # the actor returns a collab/related post from a different user
         leaked = {
             **SAMPLE_VIDEO_POST,
             "code": "LEAK1",
             "user": {"username": "atlasberry008"},
         }
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_dataset = MagicMock()
-        mock_dataset.iterate_items.return_value = [SAMPLE_VIDEO_POST, leaked]
-        run = MagicMock()
-        run.default_dataset_id = "ds123"
-        mock_client.actor.return_value.call.return_value = run
-        mock_client.dataset.return_value = mock_dataset
+        mock_run_actor.return_value = [SAMPLE_VIDEO_POST, leaked]
 
         handles = [{"handle": "competitor1"}]  # only competitor1 requested
         with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
@@ -168,43 +148,22 @@ class TestScrape:
         assert "atlasberry008" not in result_handles
         assert result_handles == {"competitor1"}
 
-    @patch("scripts.scrape_instagram.ApifyClient")
-    def test_scrape_handle_filter_is_case_insensitive(self, mock_client_class):
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_dataset = MagicMock()
-        mock_dataset.iterate_items.return_value = [SAMPLE_VIDEO_POST]  # user: competitor1
-        run = MagicMock()
-        run.default_dataset_id = "ds123"
-        mock_client.actor.return_value.call.return_value = run
-        mock_client.dataset.return_value = mock_dataset
+    @patch("scripts.scrape_instagram.run_actor")
+    def test_scrape_handle_filter_is_case_insensitive(self, mock_run_actor):
+        mock_run_actor.return_value = [SAMPLE_VIDEO_POST]  # user: competitor1
 
         with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
             result = scrape([{"handle": "Competitor1"}], posts_per_handle=10, lookback_days=365)
         assert len(result) == 1 and result[0]["handle"] == "competitor1"
 
-    @patch("scripts.scrape_instagram.ApifyClient")
-    def test_scrape_overfetches_results_limit(self, mock_client_class):
-        mock_client = MagicMock()
-        mock_client_class.return_value = mock_client
-        mock_dataset = MagicMock()
-        mock_dataset.iterate_items.return_value = []
-        run = MagicMock()
-        run.default_dataset_id = "ds123"
-        mock_client.actor.return_value.call.return_value = run
-        mock_client.dataset.return_value = mock_dataset
+    @patch("scripts.scrape_instagram.run_actor")
+    def test_scrape_overfetches_results_limit(self, mock_run_actor):
+        mock_run_actor.return_value = []
 
         with patch.dict(os.environ, {"APIFY_TOKEN": "test_token"}):
             scrape([{"handle": "competitor1"}], posts_per_handle=10, lookback_days=365)
 
-        run_input = mock_client.actor.return_value.call.call_args.kwargs["run_input"]
+        args, _ = mock_run_actor.call_args
+        run_input = args[2]
         # over-fetch so handle filtering doesn't starve the count
         assert run_input["resultsLimit"] >= 20
-
-
-class TestEnvPathFor:
-    def test_derives_project_env_from_config_path(self, tmp_path):
-        cfg = tmp_path / "config" / "competitors.json"
-        cfg.parent.mkdir()
-        cfg.write_text("{}")
-        assert _env_path_for(str(cfg)) == tmp_path / ".env"

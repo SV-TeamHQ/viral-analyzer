@@ -62,3 +62,18 @@ class TestMergeAnalyses:
                      "frames": ["temp/frames/A1/frame_01.jpg"]}]
         result = merge_analyses(selected, str(tmp_path))
         assert result[0]["frames"] == ["temp/frames/A1/frame_01.jpg"]
+
+    def test_spoken_hook_passes_through_merge(self, tmp_path):
+        # post in selected_posts.json
+        posts = [{"id": "C1", "handle": "alice", "url": "u", "likes": 5,
+                  "comments": 1, "views": 10, "outlier_score": 1.0, "caption": "c"}]
+        # agent analysis includes a spoken_hook
+        analysis = {"shortCode": "C1", "handle": "agent-said", "why_it_worked": "x",
+                    "spoken_hook": {"text": "Stop scrolling.", "type": "pattern interrupt",
+                                    "window": "0:00-0:02"}}
+        (tmp_path / "C1.json").write_text(json.dumps(analysis))
+        merged = merge_analyses(posts, str(tmp_path))
+        # agent-emitted field survives merge unchanged
+        assert merged[0]["spoken_hook"] == analysis["spoken_hook"]
+        # ground-truth handle still wins over the agent's
+        assert merged[0]["handle"] == "alice"

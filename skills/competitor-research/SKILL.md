@@ -21,7 +21,7 @@ Two substitution variables are used throughout (Claude Code fills these in):
 Set these in your head before running anything:
 - Scripts → `${CLAUDE_PLUGIN_ROOT}/scripts/<name>.py`
 - Working data → `${CLAUDE_PROJECT_DIR}/temp/...`
-- Reports → `${CLAUDE_PROJECT_DIR}/output/reports/...`
+- Reports → `${CLAUDE_PROJECT_DIR}/output/runs/{date}_{HHMM}/...`
 - User config → `${CLAUDE_PROJECT_DIR}/config/competitors.json`
 - Secrets → `${CLAUDE_PROJECT_DIR}/.env` (read by `python-dotenv` from the CWD)
 
@@ -122,16 +122,32 @@ extracted frames). This is orchestration, not a single script:
 If fewer than ~3 posts analyze successfully, warn the user that the report may not be
 representative before continuing.
 
+### Phase 3e — Niche Patterns (cross-post synthesis) ✅
+
+Spawn the `pattern-synthesizer` sub-agent ONCE (not in parallel — it needs the
+whole cohort). It reads `${CLAUDE_PROJECT_DIR}/temp/analyses.json` and writes
+`${CLAUDE_PROJECT_DIR}/temp/patterns.json` (prose summary + hook playbook +
+format mix + topics).
+
+If it fails or the file is absent, Phase 4 still runs — `generate_report` falls
+back to a data-driven summary.
+
 ### Phase 4 — Generate Report ✅
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/generate_report.py" \
   --input "${CLAUDE_PROJECT_DIR}/temp/analyses.json" \
-  --output-dir "${CLAUDE_PROJECT_DIR}/output/reports" \
-  --summary "${CLAUDE_PROJECT_DIR}/temp/niche_summary.txt"
+  --output-dir "${CLAUDE_PROJECT_DIR}/output" \
+  --summary "${CLAUDE_PROJECT_DIR}/temp/niche_summary.txt" \
+  --patterns "${CLAUDE_PROJECT_DIR}/temp/patterns.json"
 ```
-The `--summary` file is optional: if absent (or `--summary ""`), the report uses a
-data-driven fallback summary. The HTML report (full frame images rendered with
-`object-fit: contain`) is written to `${CLAUDE_PROJECT_DIR}/output/reports/IG-Competitor-Research_{date}_{HHMM}.html`
+`--output-dir` is now the runs-root parent (`${CLAUDE_PROJECT_DIR}/output`);
+`generate_report` creates the timestamped run dir itself. The report, PDF, and
+`research.json` (the durable handoff for future stages) all land in the new run dir
+`${CLAUDE_PROJECT_DIR}/output/runs/{date}_{HHMM}/`. The `--summary` and `--patterns`
+files are both optional: if either is absent (or passed as `""`), the report uses a
+data-driven fallback summary and omits the patterns section. The HTML report (full
+frame images rendered with `object-fit: contain`) is written to
+`output/runs/{date}_{HHMM}/IG-Competitor-Research_{date}_{HHMM}.html`
 (run-versioned by date + minute, so same-day re-runs never overwrite).
 
 By default a **PDF** is also rendered from that HTML (`--pdf`, disable with `--no-pdf`)
@@ -144,10 +160,16 @@ an existing HTML file directly: `python "${CLAUDE_PLUGIN_ROOT}/scripts/generate_
 
 Run phases 1 → 4 end-to-end. All phases are implemented. After the Phase 3d analysis +
 merge, optionally spawn a sub-agent to draft an AI niche summary and write it to
-`${CLAUDE_PROJECT_DIR}/temp/niche_summary.txt` before Phase 4.
+`${CLAUDE_PROJECT_DIR}/temp/niche_summary.txt` before Phase 3e. Phase 3e
+(pattern-synthesizer) then writes `temp/patterns.json`, which Phase 4 consumes.
+
+After Phase 4, the run's durable outputs live in
+`${CLAUDE_PROJECT_DIR}/output/runs/{date}_{HHMM}/`: the HTML/PDF report and
+`research.json` (analyzed posts + patterns). Future stages read `research.json`
+without re-scraping.
 
 After a successful run, you may offer to clean up `${CLAUDE_PROJECT_DIR}/temp/` (it is
-recreated on the next run). Keep `${CLAUDE_PROJECT_DIR}/output/reports/`.
+recreated on the next run). Keep the run dir under `${CLAUDE_PROJECT_DIR}/output/runs/`.
 
 ## Notes
 - Instagram CDN URLs expire within hours — always run Phase 3a immediately after Phase 1.

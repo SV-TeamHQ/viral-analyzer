@@ -32,6 +32,12 @@ The fields you care about:
 ## Analysis fields
 
 - **hook** — the opening line / first ~3 seconds that grabs attention
+- **spoken_hook** — a structured object capturing the verbatim spoken opener:
+  - `text` — the exact words spoken in the first ~3 seconds (verbatim, from the transcript)
+  - `type` — one of: `contrarian claim`, `curiosity gap`, `pattern interrupt`,
+    `direct address`, `story / open loop`, `numbered promise`, `question`,
+    `shocking stat` (use `other` only if none fit)
+  - `window` — the time range it occupies, e.g. `0:00-0:03`
 - **visual_format** — talking head, listicle, carousel, text overlay, B-roll montage,
   screen recording, etc.
 - **format_breakdown** — visual structure: transitions, text placement, pacing
@@ -51,6 +57,11 @@ the scraped data, so you cannot accidentally report a wrong number):
 {
   "shortCode": "<id>",
   "hook": "...",
+  "spoken_hook": {
+    "text": "...",
+    "type": "contrarian claim",
+    "window": "0:00-0:03"
+  },
   "visual_format": "...",
   "format_breakdown": "...",
   "topic": "...",
@@ -71,4 +82,6 @@ Write it with the Write tool to `${CLAUDE_PROJECT_DIR}/temp/analyses/{id}.json`.
 - Use the exact JSON keys above — downstream parsing depends on them.
 - If frames or transcript are missing, analyze what you have and note the gap inside
   `why_it_worked` rather than failing or writing an empty file.
+- If there is no spoken audio (silent reel, image post), omit `spoken_hook`
+  entirely — the report renders without that block. Do not emit empty strings.
 - Always write the output file, even if the analysis is partial.

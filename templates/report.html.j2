@@ -44,6 +44,26 @@
       text-decoration: none; font-weight: 600; }
     .link:hover { text-decoration: underline; }
     .placeholder { color: var(--dim); font-style: italic; }
+    .patterns { border-color: var(--accent2); }
+    .patterns h2 { margin-bottom: 10px; }
+    .pattern-block { margin-top: 14px; }
+    .pattern-block .label { margin-bottom: 6px; }
+    .hook-type { background: #15171c; border: 1px solid var(--line); border-radius: 6px;
+      margin-bottom: 6px; }
+    .hook-type > .ht-head { padding: 8px 10px; font-size: 13px; }
+    .hook-type > .ht-body { border-top: 1px solid var(--line); padding: 8px 10px;
+      font-size: 12px; color: var(--dim); }
+    .hook-type .ht-body ul { margin: 4px 0 0 16px; padding: 0; color: #cdd2da; line-height: 1.5; }
+    .fmt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; font-size: 12px; }
+    .fmt-name { width: 120px; display: inline-block; }
+    .fmt-bar { height: 6px; border-radius: 3px; display: inline-block; }
+    .spoken-hook { background: #15171c; border-left: 3px solid var(--accent);
+      border-radius: 4px; padding: 8px 10px; margin: 0 0 12px; }
+    .spoken-hook .sh-tag { color: var(--accent); font-size: 11px; }
+    .spoken-hook .sh-chip { background: var(--line); color: #cdd2da; font-size: 10px;
+      padding: 1px 6px; border-radius: 8px; }
+    .spoken-hook .sh-win { color: var(--dim); font-size: 10px; }
+    .spoken-hook .sh-text { font-style: italic; color: var(--ink); font-size: 13px; }
 
     /* Print / PDF: light theme (Chromium's page.pdf renders with print media).
        Screen viewing keeps the dark theme above. */
@@ -79,9 +99,46 @@
       Posts: {{ total }}
     </div>
 
-    <section class="summary">
+    <section class="summary patterns">
       <h2>🔥 What's Working in the Niche</h2>
       <p>{{ summary }}</p>
+
+      {% if patterns %}
+      <div class="pattern-block">
+        <h3 style="margin:0 0 8px;font-size:15px;">Niche Patterns</h3>
+        <div class="label">Top hook structures</div>
+        {% for ht in patterns.hook_types or [] %}
+        <div class="hook-type">
+          <div class="ht-head"><strong style="color:var(--accent);">{{ loop.index }}. {{ ht.name }}</strong> · {{ ht.count }} posts ({{ "{:.0%}".format(ht.share) }})</div>
+          <div class="ht-body">
+            <em>Definition:</em> {{ ht.definition }}
+            <div style="margin-top:4px;"><em>How it was executed:</em></div>
+            <ul>
+              {% for ex in ht.examples or [] %}
+              <li><strong>@{{ ex.handle }}</strong> — {{ ex.execution }} <span style="color:var(--accent);">{{ ex.outlier_score }}x</span></li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endfor %}
+
+        {% if patterns.formats %}
+        <div class="label" style="margin-top:10px;">Dominant formats</div>
+        {% for f in patterns.formats %}
+        <div class="fmt-row">
+          <span class="fmt-name">{{ f.name }}</span>
+          <span class="fmt-bar" style="width: {{ "{:.0%}".format(f.share) }}; background: {% if loop.index0 == 0 %}var(--accent){% else %}var(--accent2){% endif %};"></span>
+          <span style="color:var(--dim);">{{ "{:.0%}".format(f.share) }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if patterns.topics %}
+        <div class="label" style="margin-top:10px;">Recurring topics</div>
+        <p style="font-size:13px;color:#cdd2da;">{{ patterns.topics | join(" · ") }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
     </section>
 
     {% for post in posts %}
@@ -98,6 +155,17 @@
 
         {% if post.thumbnail %}
           <img class="thumb" src="{{ post.thumbnail }}" alt="frame for @{{ post.handle }}">
+        {% endif %}
+
+        {% if post.spoken_hook %}
+        <div class="spoken-hook">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
+            <span class="sh-tag">▶ SPOKEN HOOK</span>
+            <span class="sh-chip">{{ post.spoken_hook.type }}</span>
+            <span class="sh-win">{{ post.spoken_hook.window }}</span>
+          </div>
+          <div class="sh-text">"{{ post.spoken_hook.text }}"</div>
+        </div>
         {% endif %}
 
         {% if post.analyzed %}
