@@ -10,14 +10,18 @@ SUBREDDITS = ["entrepreneur", "SideProject", "ChatGPT", "artificial"]
 
 
 def _pytrends_niches(seed: str) -> list[tuple[str, int]]:
+    # Issue 1: do NOT fabricate a "technology" default — pytrends needs a real
+    # keyword. An empty seed yields no niches; the skill prompts for one.
+    if not seed:
+        return []
     try:
         from pytrends.request import TrendReq
     except ImportError:
         return []
     try:
         pytrends = TrendReq(hl="en-US", tz=0)
-        pytrends.build_payload([seed or "technology"], timeframe="today 3-m")
-        df = pytrends.related_queries()[seed or "technology"].get("rising", [])
+        pytrends.build_payload([seed], timeframe="today 3-m")
+        df = pytrends.related_queries()[seed].get("rising", [])
         if df is None or len(df) == 0:
             return []
         # df has 'query' and 'value' (percent growth); take top 10
@@ -30,6 +34,10 @@ def _pytrends_niches(seed: str) -> list[tuple[str, int]]:
 def _reddit_niches(seed: str) -> list[tuple[str, int]]:
     cid, secret = os.environ.get("REDDIT_CLIENT_ID"), os.environ.get("REDDIT_CLIENT_SECRET")
     if not (cid and secret):
+        # Issue 3: surface the missing signal instead of failing silently.
+        print("WARN: Reddit signal unavailable (no REDDIT_CLIENT_ID/SECRET) — "
+              "Phase A running on Google Trends only. Add Reddit creds to .env "
+              "for richer niche signals.")
         return []
     try:
         import praw

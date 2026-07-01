@@ -30,3 +30,20 @@ def test_pull_trends_empty_when_no_sources(monkeypatch):
     monkeypatch.setattr(m, "_pytrends_niches", lambda seed: [])
     monkeypatch.setattr(m, "_reddit_niches", lambda seed: [])
     assert pull_trends("AI", use_reddit=True) == []
+
+
+def test_pytrends_returns_empty_without_seed():
+    # Issue 1: no fabricated "technology" default when seed is empty.
+    import scripts.discovery_pull_trends as m
+    assert m._pytrends_niches("") == []
+
+
+def test_reddit_warns_when_no_creds(monkeypatch, capsys):
+    # Issue 3: a missing Reddit signal must be visible, not silent.
+    import scripts.discovery_pull_trends as m
+    monkeypatch.delenv("REDDIT_CLIENT_ID", raising=False)
+    monkeypatch.delenv("REDDIT_CLIENT_SECRET", raising=False)
+    assert m._reddit_niches("AI") == []
+    captured = capsys.readouterr()
+    assert "WARN" in captured.out and "Reddit" in captured.out
+

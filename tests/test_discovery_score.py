@@ -18,47 +18,78 @@ def test_compute_final_score_weights():
     assert parts["engagement_rate"] == 0.06
     assert parts["cross_hashtag_count"] == 3
 
-def test_score_handles_returns_top_sorted(monkeypatch):
+
+def _profile(username, followers, posts):
+    """Real apify/instagram-profile-scraper item shape."""
+    return {"username": username, "followersCount": followers,
+            "latestPosts": [{"likesCount": l, "commentsCount": c} for (l, c) in posts]}
+
+
+def test_score_handles_computes_engagement_from_latest_posts(monkeypatch):
+    # Candidates arrive as owner IDs from Phase B; Phase C resolves username.
     candidates = [
-        {"handle": "a", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"},
-        {"handle": "b", "hashtags": ["#x"], "post_count": 1, "niche": "AI"},
+        {"handle": "id_a", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"},
+        {"handle": "id_b", "hashtags": ["#x"], "post_count": 1, "niche": "AI"},
     ]
+    profiles = {
+        "id_a": _profile("real_a", 5000, [(80, 10), (120, 20)]),   # avg 115 eng
+        "id_b": _profile("real_b", 2000, [(40, 5)]),               # avg 45 eng
+    }
     def fake_run(token, actor, run_input):
-        return [{"followersCount": 1000, "avgLikes": 80, "avgComments": 10}]
+        return [profiles[run_input["usernames"][0]]]
     monkeypatch.setenv("APIFY_TOKEN", "tok")
     with patch("scripts.discovery_score.run_actor", side_effect=fake_run):
         out = score_handles(candidates, "tok", top_n=10)
     assert out[0]["final_score"] >= out[-1]["final_score"]
-    assert "handle" in out[0] and "niche" in out[0]
+    # Issue 5: output handles are RESOLVED USERNAMES, not the input ids
+    handles = {h["handle"] for h in out}
+    assert "real_a" in handles
+    assert "id_a" not in handles
+    assert "niche" in out[0]
+    # Issue 7: engagement was computed from latestPosts (not nonexistent avg fields)
+    a = next(h for h in out if h["handle"] == "real_a")
+    assert a["engagement_rate"] == round((100 + 15) / 5000, 4)  # avg(80+10),(120+20)=100,15
+
+
+def test_min_followers_gate_drops_tiny_accounts(monkeypatch):
+    candidates = [
+        {"handle": "small", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"},
+        {"handle": "big", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"},
+    ]
+    profiles = {
+        "small": _profile("small", 14, [(5, 1)]),       # tiny account, one viral post
+        "big": _profile("big", 50000, [(500, 50)]),
+    }
+    def fake_run(token, actor, run_input):
+        return [profiles[run_input["usernames"][0]]]
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_score.run_actor", side_effect=fake_run):
+        out = score_handles(candidates, "tok", top_n=10, min_followers=1000)
+    handles = {h["handle"] for h in out}
+    assert "big" in handles
+    assert "small" not in handles
+    assert all(h["followers"] >= 1000 for h in out)
 
 
 def test_outlier_potential_nonzero_with_real_profile_data(monkeypatch):
-    """Regression: candidates arrive WITHOUT pre-filled followers/avg_likes
+    """Regression: candidates arrive WITHOUT pre-filled followers/engagement
     (as real Apify Phase B output does). The cohort median used by the
     outlier_potential component must be derived from REAL scraped data, not
-    from the pre-scrape zeros that previously zeroed-out the component.
-    """
+    from the pre-scrape zeros that previously zeroed-out the component."""
     candidates = [
-        {"handle": "a", "hashtags": ["#x", "#y", "#z"], "post_count": 5, "niche": "AI"},
-        {"handle": "b", "hashtags": ["#x", "#y"], "post_count": 4, "niche": "AI"},
-        {"handle": "c", "hashtags": ["#x"], "post_count": 3, "niche": "AI"},
+        {"handle": "id_a", "hashtags": ["#x", "#y", "#z"], "post_count": 5, "niche": "AI"},
+        {"handle": "id_b", "hashtags": ["#x", "#y"], "post_count": 4, "niche": "AI"},
+        {"handle": "id_c", "hashtags": ["#x"], "post_count": 3, "niche": "AI"},
     ]
-
     profiles = {
-        "a": {"followersCount": 1000, "avgLikes": 200, "avgComments": 50},   # 250 eng
-        "b": {"followersCount": 2000, "avgLikes": 100, "avgComments": 20},   # 120 eng
-        "c": {"followersCount": 500, "avgLikes": 40, "avgComments": 10},     # 50 eng
+        "id_a": _profile("real_a", 1000, [(200, 50)]),    # 250 eng
+        "id_b": _profile("real_b", 2000, [(100, 20)]),    # 120 eng
+        "id_c": _profile("real_c", 500, [(40, 10)]),      # 50 eng
     }
-
     def fake_run(token, actor, run_input):
-        username = run_input["usernames"][0]
-        return [profiles[username]]
-
+        return [profiles[run_input["usernames"][0]]]
     monkeypatch.setenv("APIFY_TOKEN", "tok")
     with patch("scripts.discovery_score.run_actor", side_effect=fake_run):
         out = score_handles(candidates, "tok", top_n=10)
-
-    # At least one scored handle must show a non-zero outlier_potential —
-    # i.e. the cohort median was computed from real engagement counts.
     assert any(h["outlier_potential"] > 0 for h in out), \
         f"outlier_potential all zero — cohort median not derived from scraped data: {out}"

@@ -1,0 +1,11 @@
+{
+  "_comment": "Curated, known-volume hashtags per niche category. discovery_handles.hashtags_for_niche() consults this (case-insensitive exact match) before falling back to its string generator. Edit freely; add categories as you discover them. Keep hashtags vetted (real volume, on-topic) — this exists because auto-generated hashtags were often dead or off-topic (Issue 6).",
+  "AI tools": ["#aitools", "#chatgpt", "#artificialintelligence", "#aiproductivity", "#techhacks"],
+  "AI video": ["#aivideo", "#aicontentcreator", "#videoai", "#generativeai", "#aianimation"],
+  "AI art": ["#aiart", "#aiartcommunity", "#midjourney", "#stablediffusion", "#generativeart"],
+  "personal finance": ["#personalfinance", "#investing", "#financialfreedom", "#moneytips", "#budgeting"],
+  "fitness": ["#fitness", "#workout", "#gym", "#fitnessmotivation", "#healthylifestyle"],
+  "entrepreneurship": ["#entrepreneur", "#smallbusiness", "#startup", "#businessowner", "#sidehustle"],
+  "productivity": ["#productivity", "#timemanagement", "#notion", "#planner", "#deepwork"],
+  "marketing": ["#digitalmarketing", "#socialmediamarketing", "#contentmarketing", "#branding", "#marketingtips"]
+}
