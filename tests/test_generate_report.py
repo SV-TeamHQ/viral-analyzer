@@ -102,6 +102,39 @@ class TestRenderReport:
         assert "break-inside: avoid" in html
 
 
+def test_patterns_section_renders(tmp_path):
+    from scripts.generate_report import render_report
+    analyses = json.loads(Path("tests/fixtures/sample_analyses.json").read_text())
+    patterns = json.loads(Path("tests/fixtures/sample_patterns.json").read_text())
+    html = render_report(analyses, "SUM", "2026-07-01",
+                         "templates/report.html.j2", patterns=patterns)
+    assert "Niche Patterns" in html
+    assert "Contrarian claim" in html          # hook type name
+    assert "Talking head" in html              # format name
+    assert "cost-reduction" in html            # topic
+
+
+def test_spoken_hook_block_renders(tmp_path):
+    from scripts.generate_report import render_report
+    analyses = json.loads(Path("tests/fixtures/sample_analyses.json").read_text())
+    html = render_report(analyses, "SUM", "2026-07-01",
+                         "templates/report.html.j2", patterns=None)
+    assert "SPOKEN HOOK" in html
+    assert "contrarian claim" in html
+    assert "0:00-0:03" in html
+
+
+def test_card_renders_without_spoken_hook():
+    from scripts.generate_report import render_report
+    analyses = [{"id": "C1", "handle": "alice", "likes": 1, "comments": 0,
+                 "views": 10, "outlier_score": 1.0, "caption": "", "analyzed": True,
+                 "hook": "hi", "visual_format": "image", "why_it_worked": "w"}]
+    html = render_report(analyses, "SUM", "2026-07-01",
+                         "templates/report.html.j2", patterns=None)
+    assert "SPOKEN HOOK" not in html   # graceful absence
+    assert "Why It Worked" in html or "Why It" in html
+
+
 class TestGenerateReport:
     def test_writes_dated_html_file(self, tmp_path):
         analyses_file = tmp_path / "analyses.json"
