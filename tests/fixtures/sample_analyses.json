@@ -1,0 +1,134 @@
+[
+  {
+    "id": "C1",
+    "handle": "mrwhosetheboss",
+    "url": "https://instagram.com/p/C1/",
+    "likes": 124000,
+    "comments": 3100,
+    "views": 1200000,
+    "outlier_score": 8.4,
+    "analyzed": true,
+    "caption": "This AI video editor replaced my whole team in a week. I'm not joking. Full breakdown in the reel.",
+    "hook": "This AI editor replaced my entire video team in a week.",
+    "spoken_hook": {
+      "text": "This AI editor replaced my entire video team in a week.",
+      "type": "contrarian claim",
+      "window": "0:00-0:03"
+    },
+    "visual_format": "talking head",
+    "topic": "cost-reduction",
+    "why_it_worked": "Opens with a polarizing cost-reduction claim (8.4x outlier) that forces a reaction from anyone who edits video for a living; the direct-to-camera delivery sells conviction and the comment section lights up with creators defending or attacking the take.",
+    "replication_notes": "Lead with a bold, debatable cost claim tied to your own workflow, hold a prop or product on camera for credibility, then deliver the evidence in the first 5 seconds before the algorithm decides watch-time.",
+    "transcript": "This AI editor replaced my entire video team in a week. I'm not joking. It writes the cuts, it does the captions, it even picks the B-roll. Let me show you exactly how."
+  },
+  {
+    "id": "C2",
+    "handle": "aiexplained",
+    "url": "https://instagram.com/p/C2/",
+    "likes": 62000,
+    "comments": 1800,
+    "views": 540000,
+    "outlier_score": 6.1,
+    "analyzed": true,
+    "caption": "Stop paying for Premiere. There's a better way in 2026 and it's not what you think.",
+    "hook": "Stop paying for Premiere.",
+    "spoken_hook": {
+      "text": "Stop paying for Premiere.",
+      "type": "contrarian claim",
+      "window": "0:00-0:02"
+    },
+    "visual_format": "talking head",
+    "topic": "cost-reduction",
+    "why_it_worked": "A short, imperative contrarian claim (6.1x) that names a specific expensive product everyone in the niche already pays for, instantly splitting the audience into defenders and switchers; the brevity makes it impossible to scroll past.",
+    "replication_notes": "Name the incumbent tool your audience already pays for, issue a one-sentence stop command, then promise the alternative inside the reel to drive completion rate.",
+    "transcript": "Stop paying for Premiere. I know that sounds crazy, but in 2026 there is a free tool that does ninety percent of what Premiere does, and today I'm going to show it to you."
+  },
+  {
+    "id": "C3",
+    "handle": "aiexplained",
+    "url": "https://instagram.com/p/C3/",
+    "likes": 38000,
+    "comments": 920,
+    "views": 310000,
+    "outlier_score": 4.7,
+    "analyzed": true,
+    "caption": "The prompt nobody is sharing. Save this before it gets taken down.",
+    "hook": "The prompt nobody is sharing.",
+    "spoken_hook": {
+      "text": "The prompt nobody is sharing.",
+      "type": "curiosity gap",
+      "window": "0:00-0:02"
+    },
+    "visual_format": "screen recording",
+    "topic": "workflow speed",
+    "why_it_worked": "Curiosity gap (4.7x) that implies insider knowledge being withheld, paired with a save-bait caption that drives the algorithm's save signal; the screen-recording format promises a concrete payoff the viewer can copy.",
+    "replication_notes": "Tease a specific artifact the viewer can steal (a prompt, a template, a config), show it on screen rather than describing it, and use a scarcity cue in the caption to trigger saves.",
+    "transcript": "The prompt nobody is sharing. I've been using this exact prompt to cut my editing time in half, and today I'm just going to paste it on screen so you can copy it."
+  },
+  {
+    "id": "C4",
+    "handle": "techled",
+    "url": "https://instagram.com/p/C4/",
+    "likes": 41000,
+    "comments": 1100,
+    "views": 360000,
+    "outlier_score": 5.3,
+    "analyzed": true,
+    "caption": "Editors are about to lose their jobs. Here's the data nobody wants to look at.",
+    "hook": "Editors are about to lose their jobs.",
+    "spoken_hook": {
+      "text": "Editors are about to lose their jobs.",
+      "type": "contrarian claim",
+      "window": "0:00-0:03"
+    },
+    "visual_format": "talking head",
+    "topic": "cost-reduction",
+    "why_it_worked": "Fear-driven contrarian claim (5.3x) targeting a livelihood anxiety in the niche, which reliably drives both views and heated comments; framing it as 'data nobody wants to look at' adds a curiosity layer that boosts watch-time.",
+    "replication_notes": "Find the livelihood threat your niche is anxious about, state it bluntly on camera, then back it with a single chart or number so the fear feels evidence-based rather than alarmist.",
+    "transcript": "Editors are about to lose their jobs. I know that's a brutal thing to say, but the data is clear and nobody in the industry wants to look at it. So let's look at it together."
+  },
+  {
+    "id": "C5",
+    "handle": "mrwhosetheboss",
+    "url": "https://instagram.com/p/C5/",
+    "likes": 29000,
+    "comments": 640,
+    "views": 240000,
+    "outlier_score": 4.2,
+    "analyzed": true,
+    "caption": "The one setting that fixes everything. You've had it off this whole time.",
+    "hook": "The one setting that fixes everything.",
+    "spoken_hook": {
+      "text": "The one setting that fixes everything.",
+      "type": "curiosity gap",
+      "window": "0:00-0:02"
+    },
+    "visual_format": "screen recording",
+    "topic": "workflow speed",
+    "why_it_worked": "Curiosity gap (4.2x) built on a hidden single-setting fix, which is the most saveable format in the niche because the viewer expects to need it later; screen recording proves the payoff is real and copyable.",
+    "replication_notes": "Promise one specific toggle or setting that solves a universal pain, demo it on screen in under 30 seconds, and frame the caption as something the viewer has been doing wrong.",
+    "transcript": "The one setting that fixes everything. It's buried in the preferences, it's been off by default, and the second you turn it on your render times drop by half. Let me show you where it is."
+  },
+  {
+    "id": "C6",
+    "handle": "techled",
+    "url": "https://instagram.com/p/C6/",
+    "likes": 18000,
+    "comments": 420,
+    "views": 150000,
+    "outlier_score": 3.1,
+    "analyzed": true,
+    "caption": "Three tools that replaced my whole stack. Swipe to see each one.",
+    "hook": "Three tools that replaced my whole stack.",
+    "spoken_hook": {
+      "text": "Three tools that replaced my whole stack.",
+      "type": "numbered promise",
+      "window": "0:00-0:03"
+    },
+    "visual_format": "carousel",
+    "topic": "tool comparison",
+    "why_it_worked": "Numbered promise (3.1x) that sets a clear expectation of discrete, countable payoff, ideal for the carousel format because each swipe is a satisfying unit; the 'replaced my whole stack' framing taps cost-reduction anxiety while staying constructive.",
+    "replication_notes": "Pick a number that maps cleanly to carousel slides, frame each slide as one tool or one step, and tie the whole set to a cost or time saving so the carousel earns saves rather than just views.",
+    "transcript": "Three tools that replaced my whole stack. I used to pay for five different apps; now I pay for three, and they do more. Swipe through and I'll walk you through each one."
+  }
+]
