@@ -50,23 +50,39 @@ A non-empty seed is required. Present top 10; user picks 1-3.
 
 ## Phase B — Hashtag -> handle discovery
 
-**Confirm hashtags first.** Before scraping, show the user the hashtags that will
-be used for each selected niche and let them confirm or edit. This avoids burning
-Apify calls on dead/off-topic hashtags:
+**Research hashtag volumes, then confirm, then scrape.** This avoids burning
+Apify calls on dead/off-topic hashtags.
 
-```bash
-python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
-  --preview-hashtags --niche "<niche>"
-```
-Curated niches (e.g. "AI tools", "fitness") return vetted hashtags from
-`${CLAUDE_PLUGIN_ROOT}/config/hashtag_seeds.json`; others fall back to generated
-candidates. Present the list, let the user add/remove/edit, then scrape:
+1. **Research** — pick a seed hashtag for the niche (a curated one from
+   `hashtags_for_niche()`, or one the user suggests) and pull real Instagram
+   volumes + related hashtags:
 
-```bash
-python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
-  --niches "${CLAUDE_PROJECT_DIR}/temp/niches.json" \
-  --output "${CLAUDE_PROJECT_DIR}/temp/candidate_handles.json"
-```
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_hashtag_research.py" \
+     --seed "<seedhashtag>" --top-n 10
+   ```
+   Prints `<hashtag> <volume> (seed|related)` lines, ranked by volume. Present
+   the list and let the user pick/edit a confirmed set.
+
+2. **Fallback** (research empty/failed, no token, or tiny niche) — use the
+   offline generator to preview candidates:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
+     --preview-hashtags --niche "<niche>"
+   ```
+   Curated niches (e.g. "AI tools", "fitness") return vetted hashtags from
+   `${CLAUDE_PLUGIN_ROOT}/config/hashtag_seeds.json`; others are generated.
+
+3. **Scrape** — pass the confirmed hashtag set through `--hashtags` so the
+   user's choices (not the generated defaults) drive the scrape:
+
+   ```bash
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
+     --hashtags "#aitools,#chatgpt,#aiproductivity" \
+     --output "${CLAUDE_PROJECT_DIR}/temp/candidate_handles.json"
+   ```
+   (Omit `--hashtags` to fall back to per-niche generation from `--niches`.)
 
 Note: the actor returns posts as Instagram `owner.id` (no username); Phase C
 resolves each id to a real username before writing `competitors.json`.

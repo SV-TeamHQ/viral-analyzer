@@ -62,10 +62,20 @@ def build_frequency(posts: list[dict]) -> dict:
     return freq
 
 
-def discover_handles(niches: list[str], token: str, posts_per_hashtag: int = 50) -> list[dict]:
+def discover_handles(niches: list[str], token: str, posts_per_hashtag: int = 50,
+                    hashtags: list[str] | None = None) -> list[dict]:
+    # If an explicit hashtag set is given (e.g. user-confirmed via research),
+    # scrape those directly; otherwise derive per niche.
+    tag_sets: list[tuple[str, list[str]]] = []
+    if hashtags:
+        tag_sets.append(("confirmed", hashtags))
+    else:
+        for niche in niches:
+            tag_sets.append((niche, hashtags_for_niche(niche)))
+
     all_posts: list[dict] = []
-    for niche in niches:
-        for tag in hashtags_for_niche(niche):
+    for niche, tags in tag_sets:
+        for tag in tags:
             tag_name = tag.lstrip("#")
             # Issue 4: api-ninja/instagram-scraper takes `urls` (explore-tags),
             # not a `hashtags` key.
@@ -87,16 +97,19 @@ def discover_handles(niches: list[str], token: str, posts_per_hashtag: int = 50)
     return out
 
 
-def main(niches_path: str, output_path: str) -> None:
+def main(niches_path: str, output_path: str, hashtags: list[str] | None = None) -> None:
     # Issue 8: load .env from the project root (output is <root>/temp/X.json).
     project_dir = str(pathlib.Path(output_path).resolve().parent.parent)
     load_env(project_dir)
     token = os.environ.get("APIFY_TOKEN")
     if not token:
         raise RuntimeError("APIFY_TOKEN not set")
-    with open(niches_path) as f:
-        niches = [n["niche"] if isinstance(n, dict) else n for n in json.load(f)]
-    handles = discover_handles(niches, token)
+    if hashtags:
+        niches = []
+    else:
+        with open(niches_path) as f:
+            niches = [n["niche"] if isinstance(n, dict) else n for n in json.load(f)]
+    handles = discover_handles(niches, token, hashtags=hashtags)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(handles, f, indent=2)
@@ -112,8 +125,12 @@ if __name__ == "__main__":
     parser.add_argument("--preview-hashtags", action="store_true",
                         help="print the hashtags that would be scraped for --niche, then exit "
                              "(lets the skill confirm hashtags with the user before scraping)")
+    parser.add_argument("--hashtags", default=None,
+                        help="comma-separated hashtag list to scrape directly (overrides per-niche "
+                             "generation); use after the user confirms via research/preview")
     args = parser.parse_args()
     if args.preview_hashtags:
         print("\n".join(hashtags_for_niche(args.niche or "")))
     else:
-        main(args.niches, args.output)
+        tags = [t.strip() for t in args.hashtags.split(",")] if args.hashtags else None
+        main(args.niches, args.output, hashtags=tags)
