@@ -1,0 +1,101 @@
+"""Phase C — creator scoring. Ranks candidate handles by engagement + niche authority."""
+import argparse
+import json
+import os
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from viral_core.apify_client import run_actor
+from viral_core.scoring import outlier_score
+
+PROFILE_ACTOR = "apify/instagram-profile-scraper"
+
+W_ENG = 0.4
+W_CROSS = 0.4
+W_OUTLIER = 0.2
+
+
+def qualifies(c: dict, min_tags: int, top20_eng_rate: float) -> bool:
+    if len(c.get("hashtags", [])) >= min_tags:
+        return True
+    followers = c.get("followers") or 1
+    eng = (c.get("avg_likes", 0) + c.get("avg_comments", 0)) / followers
+    return eng >= top20_eng_rate
+
+
+def compute_final_score(c: dict, max_tags: int, median_engagement: float,
+                        sample_top_engagement: float) -> tuple[float, dict]:
+    followers = c.get("followers") or 1
+    eng_rate = (c.get("avg_likes", 0) + c.get("avg_comments", 0)) / followers
+    cross = len(c.get("hashtags", []))
+    cross_norm = min(cross / max_tags, 1.0) if max_tags else 0.0
+    # outlier potential: how viral the creator's best content is vs their median
+    outlier_pot = outlier_score(sample_top_engagement, median_engagement) if median_engagement else 0.0
+    # normalize components to [0,1] with soft caps
+    eng_norm = min(eng_rate / 0.10, 1.0)        # 10% engagement = max
+    out_norm = min(outlier_pot / 5.0, 1.0)      # 5x = max
+    final = round(W_ENG * eng_norm + W_CROSS * cross_norm + W_OUTLIER * out_norm, 3)
+    return final, {
+        "engagement_rate": round(eng_rate, 4),
+        "cross_hashtag_count": cross,
+        "outlier_potential": round(outlier_pot, 2),
+        "followers": followers,
+    }
+
+
+def score_handles(candidates: list[dict], token: str, top_n: int = 10) -> list[dict]:
+    max_tags = max((len(c.get("hashtags", [])) for c in candidates), default=1) or 1
+    # rough cohort engagement for the 80th-percentile threshold + a median baseline
+    eng_rates = []
+    for c in candidates:
+        f = c.get("followers") or 1
+        eng_rates.append((c.get("avg_likes", 0) + c.get("avg_comments", 0)) / f)
+    eng_rates.sort()
+    top20 = eng_rates[-max(1, len(eng_rates) // 5)] if eng_rates else 1.0
+    median_eng = eng_rates[len(eng_rates) // 2] if eng_rates else 0.0
+
+    scored = []
+    for c in candidates:
+        if not qualifies(c, min_tags=2, top20_eng_rate=top20):
+            continue
+        run_input = {"usernames": [c["handle"]]}
+        try:
+            items = run_actor(token, PROFILE_ACTOR, run_input)
+        except Exception as e:
+            print(f"WARN: profile scrape failed for {c['handle']}: {e}")
+            continue
+        if not items:
+            continue
+        prof = items[0]
+        c["followers"] = prof.get("followersCount", 0)
+        c["avg_likes"] = prof.get("avgLikes", 0)
+        c["avg_comments"] = prof.get("avgComments", 0)
+        final, parts = compute_final_score(c, max_tags, median_eng * c["followers"],
+                                           sample_top_engagement=c["avg_likes"] + c["avg_comments"])
+        scored.append({"handle": c["handle"], "niche": c.get("niche", ""),
+                       "final_score": final, **parts})
+    scored.sort(key=lambda d: d["final_score"], reverse=True)
+    return scored[:top_n]
+
+
+def main(input_path: str, output_path: str, top_n: int) -> None:
+    token = os.environ.get("APIFY_TOKEN")
+    if not token:
+        raise RuntimeError("APIFY_TOKEN not set")
+    with open(input_path) as f:
+        candidates = json.load(f)
+    scored = score_handles(candidates, token, top_n)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(scored, f, indent=2)
+    print(f"Wrote {len(scored)} scored handles -> {output_path}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Score candidate handles (Phase C)")
+    parser.add_argument("--input", default="temp/candidate_handles.json")
+    parser.add_argument("--output", default="temp/scored_handles.json")
+    parser.add_argument("--top-n", type=int, default=10)
+    args = parser.parse_args()
+    main(args.input, args.output, args.top_n)
