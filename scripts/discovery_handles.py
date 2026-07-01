@@ -11,8 +11,26 @@ from viral_core.config_io import load_env
 
 ACTOR_ID = "api-ninja/instagram-scraper"
 
+# Curated, vetted hashtag map shipped with the plugin (Issue 6).
+SEEDS_PATH = pathlib.Path(__file__).resolve().parents[1] / "config" / "hashtag_seeds.json"
+
+
+def _load_seed_map() -> dict[str, list[str]]:
+    try:
+        with open(SEEDS_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return {k: v for k, v in data.items() if not k.startswith("_")}
+    except Exception:
+        return {}
+
 
 def hashtags_for_niche(niche: str) -> list[str]:
+    # Issue 6: prefer curated, known-volume hashtags over string generation.
+    key = niche.strip().lower()
+    for cat, tags in _load_seed_map().items():
+        if cat.lower() == key:
+            return list(tags)
+    # Fallback: string manipulation for niches not in the seed map.
     words = [w for w in niche.lower().replace("-", " ").split() if w]
     base = "".join(w for w in words[:2]) or "trending"
     candidates = [f"#{base}", f"#{base}tips", f"#{words[0] if words else 'trending'}"]
@@ -89,5 +107,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Discover handles from niches (Phase B)")
     parser.add_argument("--niches", default="temp/niches.json")
     parser.add_argument("--output", default="temp/candidate_handles.json")
+    parser.add_argument("--niche", default=None,
+                        help="single niche string (for use with --preview-hashtags)")
+    parser.add_argument("--preview-hashtags", action="store_true",
+                        help="print the hashtags that would be scraped for --niche, then exit "
+                             "(lets the skill confirm hashtags with the user before scraping)")
     args = parser.parse_args()
-    main(args.niches, args.output)
+    if args.preview_hashtags:
+        print("\n".join(hashtags_for_niche(args.niche or "")))
+    else:
+        main(args.niches, args.output)

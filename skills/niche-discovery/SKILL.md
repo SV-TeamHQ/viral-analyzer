@@ -30,19 +30,37 @@ Provenance -> `${CLAUDE_PROJECT_DIR}/output/runs/{ts}/discovery.json`
 
 Ask: "Do you have a niche in mind, or should I discover trending niches for you?"
 
-- **Fast path** — user types a niche: skip Phase A; seed Phase B with it.
-- **Discovery path** — run Phase A, present top 10 niches, user picks 1-3.
+- **Fast path** — user types a niche: skip Phase A; seed Phase B with it. A niche
+  is required here (the scripts no longer fabricate a default).
+- **Discovery path** — ask for a broad category seed (e.g. "AI", "fitness") —
+  required for Google Trends. Run Phase A, present top 10 niches, user picks 1-3.
+
+> **Reddit signal:** if the user chose discovery AND `REDDIT_CLIENT_ID`/`SECRET`
+> are absent, warn them: "Phase A will run on Google Trends only — add Reddit
+> creds to `.env` for richer niche signals." The script prints this too.
 
 ## Phase A — Trend signals
 
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_pull_trends.py" \
-  --seed "<optional broad category>" \
+  --seed "<broad category, e.g. AI>" \
   --output "${CLAUDE_PROJECT_DIR}/temp/niches.json"
 ```
-Present top 10; user picks 1-3.
+A non-empty seed is required. Present top 10; user picks 1-3.
 
 ## Phase B — Hashtag -> handle discovery
+
+**Confirm hashtags first.** Before scraping, show the user the hashtags that will
+be used for each selected niche and let them confirm or edit. This avoids burning
+Apify calls on dead/off-topic hashtags:
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
+  --preview-hashtags --niche "<niche>"
+```
+Curated niches (e.g. "AI tools", "fitness") return vetted hashtags from
+`${CLAUDE_PLUGIN_ROOT}/config/hashtag_seeds.json`; others fall back to generated
+candidates. Present the list, let the user add/remove/edit, then scrape:
 
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
@@ -50,16 +68,21 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
   --output "${CLAUDE_PROJECT_DIR}/temp/candidate_handles.json"
 ```
 
+Note: the actor returns posts as Instagram `owner.id` (no username); Phase C
+resolves each id to a real username before writing `competitors.json`.
+
 ## Phase C — Creator scoring
 
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_score.py" \
   --input "${CLAUDE_PROJECT_DIR}/temp/candidate_handles.json" \
   --output "${CLAUDE_PROJECT_DIR}/temp/scored_handles.json" \
-  --top-n 10
+  --top-n 10 \
+  --min-followers 1000
 ```
-Present the ranked table (rank, handle, score, eng rate, hashtags, followers).
-User picks 3-5.
+`--min-followers` (default 1000) drops tiny accounts that would otherwise score
+alongside established creators. Lower it to surface micro-creators. Present the
+ranked table (rank, handle, score, eng rate, hashtags, followers). User picks 3-5.
 
 ## Shortlist + write config
 

@@ -9,6 +9,15 @@ def test_hashtags_for_niche():
     assert all(t.startswith("#") for t in tags)
     assert 3 <= len(tags) <= 5
 
+def test_hashtags_for_niche_uses_curated_seeds():
+    # Issue 6: a curated niche returns the vetted seed-map hashtags verbatim
+    # (case-insensitive), not the string-generated ones.
+    tags = hashtags_for_niche("AI tools")
+    assert "#chatgpt" in tags
+    assert "#aitools" in tags
+    # a curated match must not contain the generator's "#aitoolstips" artifact
+    assert all(not t.endswith("tips") for t in tags)
+
 def test_build_frequency_uses_owner_id():
     # Real api-ninja hashtag pages return owner.id (no username field).
     posts = [
