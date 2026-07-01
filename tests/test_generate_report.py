@@ -2,10 +2,54 @@ import base64
 import json
 import os
 import pytest
+from pathlib import Path
 
 from scripts.generate_report import (
     encode_frame, build_summary, render_report, generate_report,
 )
+
+
+def test_writes_research_json_into_run_dir(tmp_path):
+    analyses = json.loads(Path("tests/fixtures/sample_analyses.json").read_text())
+    analyses_path = tmp_path / "analyses.json"
+    analyses_path.write_text(json.dumps(analyses))
+    patterns_path = tmp_path / "patterns.json"
+    patterns_path.write_text(Path("tests/fixtures/sample_patterns.json").read_text())
+
+    out = generate_report(
+        input_path=str(analyses_path),
+        output_dir=str(tmp_path / "out"),
+        summary_path=None,
+        patterns_path=str(patterns_path),
+        pdf=False,
+    )
+    run_dir = Path(out).parent
+    research = json.loads((run_dir / "research.json").read_text())
+    assert research["stage"] == "research"
+    assert research["run_dir"] == str(run_dir)
+    assert research["patterns"]["summary"]
+    assert research["patterns"]["hook_types"][0]["name"] == "Contrarian claim"
+    assert Path(research["report"]["html"]).exists()
+
+
+def test_falls_back_when_no_patterns(tmp_path):
+    analyses = [{"id": "C1", "handle": "alice", "likes": 10, "comments": 1,
+                 "views": 100, "outlier_score": 2.0, "caption": "c",
+                 "analyzed": True, "visual_format": "talking head",
+                 "why_it_worked": "x"}]
+    analyses_path = tmp_path / "analyses.json"
+    analyses_path.write_text(json.dumps(analyses))
+    out = generate_report(
+        input_path=str(analyses_path),
+        output_dir=str(tmp_path / "out"),
+        summary_path=None,
+        patterns_path=None,
+        pdf=False,
+    )
+    run_dir = Path(out).parent
+    research = json.loads((run_dir / "research.json").read_text())
+    # patterns block may be absent, but research.json still written
+    assert research["stage"] == "research"
 
 
 ANALYSES = [
