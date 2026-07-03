@@ -20,51 +20,64 @@ Provenance -> `${CLAUDE_PROJECT_DIR}/output/runs/{ts}/discovery.json`
 
 ## First-run setup
 
-1. Python deps: `python -c "import requests, apify_client, pytrends"`. If missing,
+1. Python deps: `python -c "import requests, apify_client"`. If missing,
    `pip install -r "${CLAUDE_PLUGIN_ROOT}/requirements.txt"`.
-2. `APIFY_TOKEN` in `${CLAUDE_PROJECT_DIR}/.env` (required for Phases B + C).
-3. Reddit is optional: `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` enable Phase A's
-   Reddit signal. Absent -> Phase A runs on Google Trends only.
+2. `APIFY_TOKEN` in `${CLAUDE_PROJECT_DIR}/.env` (required for Phases A, B + C).
 
 ## Entry
 
-Ask: "Do you have a niche in mind, or should I discover trending niches for you?"
+Ask: "Have a niche in mind, or want to browse trending categories?"
 
-- **Fast path** — user types a niche: skip Phase A; seed Phase B with it. A niche
-  is required here (the scripts no longer fabricate a default).
-- **Discovery path** — ask for a broad category seed (e.g. "AI", "fitness") —
-  required for Google Trends. Run Phase A, present top 10 niches, user picks 1-3.
+- **Seeded** — user types a niche, keyword, or hashtag (e.g. "home gym", "#fitness",
+  "AI tools"). Resolve it to a seed hashtag via `hashtags_for_niche()` and pass it
+  to Phase A as `--seed`.
+- **Unseeded** — user wants options. Present the 17 broad categories (Fitness, Tech,
+  Food, Finance, Beauty, Gaming, Travel, Business, AI, Fashion, Health & Wellness,
+  Photography, Real Estate, Pets, Music, Cars, Apps); the picked category becomes
+  Phase A's `--category`.
 
-> **Reddit signal:** if the user chose discovery AND `REDDIT_CLIENT_ID`/`SECRET`
-> are absent, warn them: "Phase A will run on Google Trends only — add Reddit
-> creds to `.env` for richer niche signals." The script prints this too.
+## Phase A — IG-native niche discovery
 
-## Phase A — Trend signals
+One analytics-actor call on a seed hashtag returns its related hashtags with
+real IG volume — those related hashtags *are* the niche candidates. The niche
+you pick is already an IG hashtag, so there is no topic→hashtag translation.
 
+Seeded:
 ```bash
-python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_pull_trends.py" \
-  --seed "<broad category, e.g. AI>" \
+python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_explore_niches.py" \
+  --seed "#homegym" \
   --output "${CLAUDE_PROJECT_DIR}/temp/niches.json"
 ```
-A non-empty seed is required. Present top 10; user picks 1-3.
+
+Unseeded (pick a category):
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_explore_niches.py" \
+  --category fitness \
+  --output "${CLAUDE_PROJECT_DIR}/temp/niches.json"
+```
+
+Present the volume-ranked niches from `temp/niches.json` (e.g. `homegym 7.6m ·
+homeworkout 1.4m · garagegym 580k`). User picks 1–3.
+
+**Optional drill-down:** if the top-level niches feel too broad, re-run Phase A
+with one of the picks as the seed (`--seed "#homegym"`) to surface finer
+sub-niches before Phase B.
+
+If Phase A returns nothing (analytics actor failed / rate-limited / no token),
+fall back to the fast path: the user types a niche → `hashtags_for_niche()`
+offline → straight to Phase B. Discovery never hard-fails.
 
 ## Phase B — Hashtag -> handle discovery
 
-**Research hashtag volumes, then confirm, then scrape.** This avoids burning
-Apify calls on dead/off-topic hashtags.
+**Confirm the hashtag set, then scrape.** The picked Phase A niches are already
+volume-confirmed IG hashtags (the analytics-actor volumes came straight from
+Phase A), so there is no separate research step — just hand them through.
 
-1. **Research** — pick a seed hashtag for the niche (a curated one from
-   `hashtags_for_niche()`, or one the user suggests) and pull real Instagram
-   volumes + related hashtags:
+1. **Confirm** — show the user the picked Phase A niches (e.g. `#homegym,
+   #homeworkout, #garagegym`) and let them edit the set. These tokens, `#`-prefixed,
+   are the `--hashtags` value below.
 
-   ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_hashtag_research.py" \
-     --seed "<seedhashtag>" --top-n 10
-   ```
-   Prints `<hashtag> <volume> (seed|related)` lines, ranked by volume. Present
-   the list and let the user pick/edit a confirmed set.
-
-2. **Fallback** (research empty/failed, no token, or tiny niche) — use the
+2. **Fallback** (Phase A returned nothing / no token / tiny niche) — use the
    offline generator to preview candidates:
 
    ```bash
@@ -74,12 +87,12 @@ Apify calls on dead/off-topic hashtags.
    Curated niches (e.g. "AI tools", "fitness") return vetted hashtags from
    `${CLAUDE_PLUGIN_ROOT}/config/hashtag_seeds.json`; others are generated.
 
-3. **Scrape** — pass the confirmed hashtag set through `--hashtags` so the
-   user's choices (not the generated defaults) drive the scrape:
+3. **Scrape** — pass the confirmed hashtag set (the picked Phase A niches,
+   `#`-prefixed) through `--hashtags` so the user's choices drive the scrape:
 
    ```bash
    python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_handles.py" \
-     --hashtags "#aitools,#chatgpt,#aiproductivity" \
+     --hashtags "#homegym,#homeworkout,#garagegym" \
      --output "${CLAUDE_PROJECT_DIR}/temp/candidate_handles.json"
    ```
    (Omit `--hashtags` to fall back to per-niche generation from `--niches`.)
