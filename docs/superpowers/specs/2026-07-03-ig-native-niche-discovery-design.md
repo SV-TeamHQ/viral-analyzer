@@ -32,8 +32,10 @@ This spec makes Phase A **fully IG-native**: it discovers niches *inside* Instag
    │     input → hashtags_for_niche() → seed hashtag  (e.g. "#homegym")
    │
    └─ UNSEEDED  (pure discovery — "show me options")
-         user picks a broad category from a curated list
-         (Fitness, Tech, Food, Finance, Beauty, Gaming, Travel, Business)
+         user picks a broad category from a curated list (17 categories:
+         Fitness, Tech, Food, Finance, Beauty, Gaming, Travel, Business,
+         AI, Fashion, Health & Wellness, Photography, Real Estate, Pets,
+         Music, Cars, Apps)
          category → its mega-hashtag  (e.g. "#fitness")
    │
    ▼  ONE analytics-actor call on that seed hashtag
@@ -72,8 +74,11 @@ ANALYTICS_ACTOR = "apify/instagram-hashtag-analytics-scraper"
 
 CATEGORIES = {
     "fitness": "#fitness", "tech": "#tech", "food": "#food",
-    "finance": "#personalfinance", "beauty": "#makeup", "gaming": "#gaming",
+    "finance": "#personalfinance", "beauty": "#beauty", "gaming": "#gaming",
     "travel": "#travel", "business": "#entrepreneur",
+    "ai": "#ai", "fashion": "#fashion", "health & wellness": "#wellness",
+    "photography": "#photography", "real estate": "#realestate",
+    "pets": "#pets", "music": "#music", "cars": "#cars", "apps": "#apps",
 }
 
 
