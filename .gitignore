@@ -9,3 +9,6 @@ build/
 
 # Superpowers brainstorming mockups + local SDD docs (not part of the shipped plugin)
 .superpowers/
+
+# Generated reports dropped at repo root (live under output/, gitignored)
+/*.pdf
