@@ -33,14 +33,16 @@ def test_score_handles_computes_engagement_from_latest_posts(monkeypatch):
         {"handle": "id_b", "hashtags": ["#x"], "post_count": 1, "niche": "AI"},
     ]
     profiles = {
-        "id_a": _profile("real_a", 5000, [(80, 10), (120, 20)]),   # avg 115 eng
-        "id_b": _profile("real_b", 2000, [(40, 5)]),               # avg 45 eng
+        # avg 115 engagement (>= MIN_ABS_ENGAGEMENT), 5K followers (>= 1K floor)
+        "id_a": _profile("real_a", 5000, [(80, 10), (120, 20)]),
+        # avg 120 engagement (>= MIN_ABS_ENGAGEMENT), 2K followers (>= 1K floor)
+        "id_b": _profile("real_b", 2000, [(100, 20)]),
     }
     def fake_run(token, actor, run_input):
         return [profiles[run_input["usernames"][0]]]
     monkeypatch.setenv("APIFY_TOKEN", "tok")
     with patch("scripts.discovery_score.run_actor", side_effect=fake_run):
-        out = score_handles(candidates, "tok", top_n=10)
+        out = score_handles(candidates, "tok", top_n=10, min_followers=1000)
     assert out[0]["final_score"] >= out[-1]["final_score"]
     # Issue 5: output handles are RESOLVED USERNAMES, not the input ids
     handles = {h["handle"] for h in out}
@@ -53,13 +55,18 @@ def test_score_handles_computes_engagement_from_latest_posts(monkeypatch):
 
 
 def test_min_followers_gate_drops_tiny_accounts(monkeypatch):
+    # 6 above-floor candidates (>= slim_threshold) -> follower gate is strict,
+    # so the below-floor "small" account is dropped (not slim-revealed).
     candidates = [
         {"handle": "small", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"},
-        {"handle": "big", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"},
+    ] + [
+        {"handle": f"big{i}", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"}
+        for i in range(6)
     ]
     profiles = {
-        "small": _profile("small", 14, [(5, 1)]),       # tiny account, one viral post
-        "big": _profile("big", 50000, [(500, 50)]),
+        # 14 followers but 250 avg engagement -> clears 4b, dropped by follower gate
+        "small": _profile("small", 14, [(200, 50)]),
+        **{f"big{i}": _profile(f"big{i}", 50_000, [(500, 50)]) for i in range(6)},
     }
     def fake_run(token, actor, run_input):
         return [profiles[run_input["usernames"][0]]]
@@ -67,7 +74,7 @@ def test_min_followers_gate_drops_tiny_accounts(monkeypatch):
     with patch("scripts.discovery_score.run_actor", side_effect=fake_run):
         out = score_handles(candidates, "tok", top_n=10, min_followers=1000)
     handles = {h["handle"] for h in out}
-    assert "big" in handles
+    assert "big0" in handles
     assert "small" not in handles
     assert all(h["followers"] >= 1000 for h in out)
 
@@ -91,7 +98,7 @@ def test_outlier_potential_nonzero_with_real_profile_data(monkeypatch):
         return [profiles[run_input["usernames"][0]]]
     monkeypatch.setenv("APIFY_TOKEN", "tok")
     with patch("scripts.discovery_score.run_actor", side_effect=fake_run):
-        out = score_handles(candidates, "tok", top_n=10)
+        out = score_handles(candidates, "tok", top_n=10, min_followers=100)
     assert any(h["outlier_potential"] > 0 for h in out), \
         f"outlier_potential all zero — cohort median not derived from scraped data: {out}"
 
@@ -171,3 +178,79 @@ def test_caption_language_unknown_when_langdetect_missing(monkeypatch):
     monkeypatch.setitem(sys.modules, "langdetect", None)
     prof = {"latestPosts": [{"caption": "hello"}]}
     assert caption_language(prof) == "unknown"
+
+
+def test_4b_drops_low_absolute_engagement(monkeypatch):
+    # 50K followers (above any floor) but only 3 avg engagement -> dropped by 4b
+    candidates = [{"handle": "ghost", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"}]
+    profiles = {"ghost": _profile("ghost", 50_000, [(3, 0)])}
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_score.run_actor",
+               side_effect=lambda *a, **k: [profiles[a[2]["usernames"][0]]]):
+        out = score_handles(candidates, "tok", top_n=10, min_followers=1000)
+    assert all(h["handle"] != "ghost" for h in out)
+
+
+def test_4a_engagement_anomaly_flag(monkeypatch):
+    # 2K followers, avg 30K likes -> eng_rate ~15 (>1.0) -> anomaly flagged, kept
+    candidates = [{"handle": "viral", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"}]
+    profiles = {"viral": _profile("viral", 2_000, [(30_000, 500)])}
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_score.run_actor",
+               side_effect=lambda *a, **k: [profiles[a[2]["usernames"][0]]]):
+        out = score_handles(candidates, "tok", top_n=10, min_followers=1000)
+    assert any(h["handle"] == "viral" for h in out)
+    v = next(h for h in out if h["handle"] == "viral")
+    assert v["engagement_anomaly"] is True
+    assert v["engagement_rate"] > 1.0
+
+
+def test_slim_reveal_appends_below_floor_when_above_is_thin(monkeypatch):
+    # 2 above-floor (>=10K) + 2 below-floor (<10K); above count < SLIM_THRESHOLD(5)
+    candidates = [
+        {"handle": f"h{i}", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"}
+        for i in range(4)
+    ]
+    profiles = {
+        "h0": _profile("h0", 20_000, [(500, 50)]),    # above floor
+        "h1": _profile("h1", 15_000, [(400, 40)]),    # above floor
+        "h2": _profile("h2", 3_000, [(300, 30)]),     # below floor
+        "h3": _profile("h3", 2_000, [(200, 20)]),     # below floor
+    }
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_score.run_actor",
+               side_effect=lambda *a, **k: [profiles[a[2]["usernames"][0]]]):
+        out = score_handles(candidates, "tok", top_n=10, min_followers=10_000)
+    handles = {h["handle"]: h for h in out}
+    assert handles["h0"]["below_follower_floor"] is False
+    assert handles["h2"]["below_follower_floor"] is True   # revealed
+    assert "h3" in handles                                 # revealed
+
+
+def test_no_slim_reveal_when_above_floor_is_sufficient(monkeypatch):
+    # 6 above-floor + 1 below-floor -> above >= SLIM_THRESHOLD -> below NOT revealed
+    candidates = [
+        {"handle": f"h{i}", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"}
+        for i in range(7)
+    ]
+    profiles = {f"h{i}": _profile(f"h{i}", 20_000, [(500, 50)]) for i in range(6)}
+    profiles["h6"] = _profile("h6", 3_000, [(300, 30)])     # below floor
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_score.run_actor",
+               side_effect=lambda *a, **k: [profiles[a[2]["usernames"][0]]]):
+        out = score_handles(candidates, "tok", top_n=10, min_followers=10_000)
+    handles = {h["handle"] for h in out}
+    assert "h6" not in handles
+    assert all(h["below_follower_floor"] is False for h in out)
+
+
+def test_default_min_followers_is_10000(monkeypatch):
+    # 5K-follower candidate with solid engagement: under default 10K floor -> flagged
+    candidates = [{"handle": "mid", "hashtags": ["#x", "#y"], "post_count": 2, "niche": "AI"}]
+    profiles = {"mid": _profile("mid", 5_000, [(500, 50)])}
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_score.run_actor",
+               side_effect=lambda *a, **k: [profiles[a[2]["usernames"][0]]]):
+        out = score_handles(candidates, "tok", top_n=10)   # no min_followers -> default 10000
+    assert any(h["handle"] == "mid" for h in out)          # revealed via slim
+    assert out[0]["below_follower_floor"] is True
