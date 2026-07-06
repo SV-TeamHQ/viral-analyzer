@@ -48,3 +48,38 @@ def test_thin_reason_when_few_related(monkeypatch):
         candidates, reason = discover_from_seed("cristiano", "fitness", "tok")
     assert reason == "thin"
     assert len(candidates) == 4   # 3 related + seed
+
+
+def test_not_found_when_actor_returns_empty(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_profiles.run_actor", return_value=[]):
+        candidates, reason = discover_from_seed("ghost", "fitness", "tok")
+    assert reason == "not_found"
+    assert candidates == []
+
+
+def test_private_seed_reason(monkeypatch):
+    # Seed item exists, is private, and has no relatedProfiles field.
+    prof = {"username": "locked", "private": True, "relatedProfiles": []}
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_profiles.run_actor", return_value=[prof]):
+        candidates, reason = discover_from_seed("locked", "fitness", "tok")
+    assert reason == "private"
+
+
+def test_actor_error_reason(monkeypatch):
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_profiles.run_actor", side_effect=RuntimeError("boom")):
+        candidates, reason = discover_from_seed("cristiano", "fitness", "tok")
+    assert reason == "actor_error"
+    assert candidates == []
+
+
+def test_related_entry_missing_username_is_skipped(monkeypatch):
+    related = [_rel(f"u{i}") for i in range(10)]
+    related.append({"id": "999", "full_name": "NoHandle", "is_private": False})  # no username
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_profiles.run_actor", return_value=[_prof(related)]):
+        candidates, reason = discover_from_seed("cristiano", "fitness", "tok")
+    assert reason == "ok"
+    assert all(c["handle"] != "999" and c["handle"] for c in candidates)
