@@ -26,15 +26,21 @@ Provenance -> `${CLAUDE_PROJECT_DIR}/output/runs/{ts}/discovery.json`
 
 ## Entry
 
-Ask: "Have a niche in mind, or want to browse trending categories?"
+Ask in two steps.
 
-- **Seeded** — user types a niche, keyword, or hashtag (e.g. "home gym", "#fitness",
-  "AI tools"). Resolve it to a seed hashtag via `hashtags_for_niche()` and pass it
-  to Phase A as `--seed`.
-- **Unseeded** — user wants options. Present the 17 broad categories (Fitness, Tech,
-  Food, Finance, Beauty, Gaming, Travel, Business, AI, Fashion, Health & Wellness,
-  Photography, Real Estate, Pets, Music, Cars, Apps); the picked category becomes
-  Phase A's `--category`.
+**Step 1 — niche label** (always; tags the whole run and is written to
+`config/competitors.json`):
+"What niche are you researching?" (e.g. "home gym", "AI tools", "fitness").
+
+**Step 2 — optional seed creator** (routes Phase B):
+"Got a creator in this niche to start from? Paste an Instagram handle
+(e.g. `cristiano`), or skip to browse by hashtag."
+
+- **Seed handle given → profile-first Phase B** (bias-free established-peer
+  discovery via Instagram's related-accounts graph).
+- **Skip → hashtag Phase B** (the existing Phase A → hashtag path).
+
+Capture both: `niche_label` (Step 1) and `seed_handle` (Step 2, may be empty).
 
 ## Phase A — IG-native niche discovery
 
@@ -66,6 +72,34 @@ sub-niches before Phase B.
 If Phase A returns nothing (analytics actor failed / rate-limited / no token),
 fall back to the fast path: the user types a niche → `hashtags_for_niche()`
 offline → straight to Phase B. Discovery never hard-fails.
+
+## Phase B (profile-first) — Seed -> related creators
+
+When the user gave a seed handle in Step 2, run the profile-first path instead
+of the hashtag path. One scrape of the seed returns its `relatedProfiles`
+(Instagram's "similar accounts" — established peers, not whoever posted in
+the last 10 minutes).
+
+```bash
+python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_profiles.py" \
+  --seed "<handle>" \
+  --niche "<niche_label>" \
+  --output "${CLAUDE_PROJECT_DIR}/temp/candidate_handles.json"
+```
+
+The candidate JSON is the same contract the hashtag path writes, so Phase C
+consumes it unchanged. Candidates carry no hashtags (Phase C's single-hashtag
+weighting from the Phase C hardening handles that).
+
+**If the script exits non-zero** (it prints a cause-named message), the cluster
+is thin or the seed was invalid/private. Surface the cause and offer the user
+three choices — do not silently switch strategies:
+1. **Proceed** with the thin pool (the candidate JSON was still written).
+2. **Try a different seed** handle.
+3. **Fall back to the hashtag path** for `<niche_label>` (continue to the
+   "Phase B — Hashtag" section below).
+
+On a non-thin success, skip straight to Phase C.
 
 ## Phase B — Hashtag -> handle discovery
 
