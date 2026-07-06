@@ -74,6 +74,8 @@ def test_actor_error_reason(monkeypatch):
         candidates, reason = discover_from_seed("cristiano", "fitness", "tok")
     assert reason == "actor_error"
     assert candidates == []
+    from scripts.discovery_profiles import LAST_ACTOR_ERROR
+    assert LAST_ACTOR_ERROR == "boom"
 
 
 def test_related_entry_missing_username_is_skipped(monkeypatch):

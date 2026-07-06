@@ -18,6 +18,7 @@ from viral_core.config_io import load_env
 
 PROFILE_ACTOR = "apify/instagram-profile-scraper"
 THIN_THRESHOLD = 8
+LAST_ACTOR_ERROR = None
 
 
 def discover_from_seed(seed: str, niche: str, token: str) -> tuple[list[dict], str]:
@@ -31,7 +32,9 @@ def discover_from_seed(seed: str, niche: str, token: str) -> tuple[list[dict], s
     try:
         items = run_actor(token, PROFILE_ACTOR,
                           {"usernames": [seed], "resultsLimit": 1})
-    except Exception:
+    except Exception as e:
+        global LAST_ACTOR_ERROR
+        LAST_ACTOR_ERROR = str(e)
         return [], "actor_error"
     if not items:
         return [], "not_found"
@@ -60,7 +63,7 @@ _CAUSE_MESSAGES = {
     "thin":      "THIN CLUSTER: {n} profiles from seed @{seed}",
     "not_found": "SEED NOT FOUND: @{seed}",
     "private":   "SEED PRIVATE: @{seed} has no related profiles",
-    "actor_error": "SEED FAILED: @{seed} — actor raised",
+    "actor_error": "SEED FAILED: @{seed} — {error}",
 }
 
 
@@ -78,7 +81,7 @@ def main(seed: str, niche: str, output_path: str) -> None:
         print(f"Wrote {len(candidates)} candidate handles -> {output_path}")
         return
     n = len(candidates)
-    print(_CAUSE_MESSAGES[reason].format(n=n, seed=seed))
+    print(_CAUSE_MESSAGES[reason].format(n=n, seed=seed, error=LAST_ACTOR_ERROR or "actor raised"))
     sys.exit(1)
 
 
