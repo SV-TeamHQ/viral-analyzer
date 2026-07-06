@@ -57,3 +57,14 @@ def test_analytics_actor_returns_posts_count_and_related():
     assert related, f"no related hashtags — shape drift? sample: {rec}"
     assert related[0].get("hash"), "related entry missing 'hash' field"
     assert related[0].get("info"), "related entry missing 'info' (volume) field"
+
+
+def test_profile_scrape_returns_related_profiles_with_username():
+    # Profile-first Phase B depends on relatedProfiles[].username existing.
+    profs = run_actor(TOKEN, PROFILE_ACTOR,
+                      {"usernames": ["cristiano"], "resultsLimit": 1})
+    assert profs, "profile actor returned no items"
+    related = profs[0].get("relatedProfiles") or []
+    assert related, f"no relatedProfiles — shape drift? keys: {list(profs[0].keys())}"
+    assert related[0].get("username"), (
+        f"related entry missing username — shape drift? entry: {related[0]}")
