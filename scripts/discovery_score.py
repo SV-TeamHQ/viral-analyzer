@@ -17,6 +17,16 @@ W_ENG = 0.4
 W_CROSS = 0.4
 W_OUTLIER = 0.2
 
+# 4d — follower-tiered engagement caps (replaces the flat 0.10 normalization).
+ENG_CAP_MICRO = 0.10   # < 10K followers
+ENG_CAP_MID = 0.08     # 10K-100K
+ENG_CAP_MACRO = 0.05   # 100K+
+
+# 4c — effective weights when cross-hashtag is structurally impossible (max_tags < 2).
+W_ENG_NOCROSS = 0.7
+W_CROSS_NOCROSS = 0.0
+W_OUTLIER_NOCROSS = 0.3
+
 
 def qualifies(c: dict, min_tags: int, top20_eng_rate: float) -> bool:
     if len(c.get("hashtags", [])) >= min_tags:
@@ -26,18 +36,30 @@ def qualifies(c: dict, min_tags: int, top20_eng_rate: float) -> bool:
     return eng >= top20_eng_rate
 
 
+def _eng_cap(followers: int) -> float:
+    """4d: engagement-rate cap by follower tier. Larger accounts saturate at a
+    lower rate so a 100K/5% creator isn't equalized with a 1K/10% creator."""
+    if followers >= 100_000:
+        return ENG_CAP_MACRO
+    if followers >= 10_000:
+        return ENG_CAP_MID
+    return ENG_CAP_MICRO
+
+
 def compute_final_score(c: dict, max_tags: int, median_engagement: float,
                         sample_top_engagement: float) -> tuple[float, dict]:
     followers = c.get("followers") or 1
     eng_rate = (c.get("avg_likes", 0) + c.get("avg_comments", 0)) / followers
     cross = len(c.get("hashtags", []))
     cross_norm = min(cross / max_tags, 1.0) if max_tags else 0.0
-    # outlier potential: how viral the creator's best content is vs their median
     outlier_pot = outlier_score(sample_top_engagement, median_engagement) if median_engagement else 0.0
-    # normalize components to [0,1] with soft caps
-    eng_norm = min(eng_rate / 0.10, 1.0)        # 10% engagement = max
-    out_norm = min(outlier_pot / 5.0, 1.0)      # 5x = max
-    final = round(W_ENG * eng_norm + W_CROSS * cross_norm + W_OUTLIER * out_norm, 3)
+    eng_norm = min(eng_rate / _eng_cap(followers), 1.0)        # 4d
+    out_norm = min(outlier_pot / 5.0, 1.0)
+    if max_tags < 2:                                            # 4c
+        w_eng, w_cross, w_out = W_ENG_NOCROSS, W_CROSS_NOCROSS, W_OUTLIER_NOCROSS
+    else:
+        w_eng, w_cross, w_out = W_ENG, W_CROSS, W_OUTLIER
+    final = round(w_eng * eng_norm + w_cross * cross_norm + w_out * out_norm, 3)
     return final, {
         "engagement_rate": round(eng_rate, 4),
         "cross_hashtag_count": cross,

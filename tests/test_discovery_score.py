@@ -2,6 +2,7 @@ import sys, pathlib
 from unittest.mock import patch
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from scripts.discovery_score import compute_final_score, qualifies, score_handles
+from scripts.discovery_score import _eng_cap, W_ENG_NOCROSS, W_CROSS_NOCROSS, W_OUTLIER_NOCROSS
 
 
 def test_qualifies_by_cross_hashtag():
@@ -93,3 +94,48 @@ def test_outlier_potential_nonzero_with_real_profile_data(monkeypatch):
         out = score_handles(candidates, "tok", top_n=10)
     assert any(h["outlier_potential"] > 0 for h in out), \
         f"outlier_potential all zero — cohort median not derived from scraped data: {out}"
+
+
+def test_eng_cap_tiers():
+    # 4d — follower-tiered engagement caps
+    assert _eng_cap(0) == 0.10        # micro (<10K)
+    assert _eng_cap(9_999) == 0.10
+    assert _eng_cap(10_000) == 0.08   # mid (10K-100K)
+    assert _eng_cap(99_999) == 0.08
+    assert _eng_cap(100_000) == 0.05  # macro (100K+)
+
+
+def test_compute_final_score_single_hashtag_uses_redistributed_weights():
+    # 4c — when max_tags < 2, weights are 0.7/0.0/0.3 (cross signal impossible)
+    c = {"handle": "a", "hashtags": ["#x"], "followers": 1000,
+         "avg_likes": 100, "avg_comments": 0}   # eng_rate = 0.10 -> eng_norm = 1.0 (micro cap)
+    # median=50, sample_top=100 -> outlier_pot = 100/50 = 2.0 -> out_norm = 0.4
+    score, parts = compute_final_score(c, max_tags=1, median_engagement=50,
+                                        sample_top_engagement=100)
+    expected = round(0.7 * 1.0 + 0.0 + 0.3 * 0.4, 3)   # 0.82
+    assert score == expected == 0.82
+
+
+def test_compute_final_score_multi_hashtag_keeps_original_weights():
+    # 4c regression — max_tags >= 2 keeps 0.4/0.4/0.2
+    c = {"handle": "a", "hashtags": ["#x", "#y", "#z"], "followers": 1000,
+         "avg_likes": 50, "avg_comments": 10}   # eng_rate = 0.06 -> eng_norm = 0.6
+    score, parts = compute_final_score(c, max_tags=3, median_engagement=30,
+                                        sample_top_engagement=93)
+    # cross_norm = 3/3 = 1.0 ; outlier_pot = 93/30 = 3.1 -> out_norm = 0.62
+    expected = round(0.4 * 0.6 + 0.4 * 1.0 + 0.2 * 0.62, 3)   # 0.764
+    assert score == expected
+
+
+def test_compute_final_score_macro_not_equalized_with_micro():
+    # 4d — a 100K/5% account and a 5K/10% account both saturate eng_norm at 1.0,
+    # so with identical other inputs they score equally (NOT penalized for size)
+    big = {"handle": "big", "hashtags": ["#x"], "followers": 100_000,
+           "avg_likes": 5000, "avg_comments": 0}     # eng_rate 0.05, cap 0.05 -> eng_norm 1.0
+    small = {"handle": "small", "hashtags": ["#x"], "followers": 5_000,
+             "avg_likes": 500, "avg_comments": 0}    # eng_rate 0.10, cap 0.10 -> eng_norm 1.0
+    s_big, _ = compute_final_score(big, max_tags=1, median_engagement=100,
+                                    sample_top_engagement=200)
+    s_small, _ = compute_final_score(small, max_tags=1, median_engagement=100,
+                                      sample_top_engagement=200)
+    assert s_big == s_small   # equal eng_norm + equal outlier -> equal score
