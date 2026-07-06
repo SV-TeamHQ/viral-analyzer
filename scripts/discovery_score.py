@@ -91,6 +91,28 @@ def _avg_engagement(prof: dict) -> tuple[float, float]:
     return avg_likes, avg_comments
 
 
+def caption_language(prof: dict, max_captions: int = 5) -> str:
+    """Fix 5: modal ISO language code across recent captions; 'unknown' if none
+    are present, langdetect isn't installed, or every detection raises.
+    langdetect is imported lazily so this module loads without it."""
+    captions = [p.get("caption", "") for p in (prof.get("latestPosts") or [])
+                if p.get("caption")]
+    if not captions:
+        return "unknown"
+    try:
+        from langdetect import detect
+    except ImportError:
+        return "unknown"
+    from collections import Counter
+    langs = []
+    for cap in captions[:max_captions]:
+        try:
+            langs.append(detect(cap))
+        except Exception:
+            pass
+    return Counter(langs).most_common(1)[0][0] if langs else "unknown"
+
+
 def score_handles(candidates: list[dict], token: str, top_n: int = 10,
                   min_followers: int = 1000) -> list[dict]:
     max_tags = max((len(c.get("hashtags", [])) for c in candidates), default=1) or 1

@@ -1,7 +1,7 @@
-import sys, pathlib
+import sys, pathlib, types
 from unittest.mock import patch
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from scripts.discovery_score import compute_final_score, qualifies, score_handles
+from scripts.discovery_score import compute_final_score, qualifies, score_handles, caption_language
 from scripts.discovery_score import _eng_cap, W_ENG_NOCROSS, W_CROSS_NOCROSS, W_OUTLIER_NOCROSS
 
 
@@ -139,3 +139,35 @@ def test_compute_final_score_macro_not_equalized_with_micro():
     s_small, _ = compute_final_score(small, max_tags=1, median_engagement=100,
                                       sample_top_engagement=200)
     assert s_big == s_small   # equal eng_norm + equal outlier -> equal score
+
+
+def _stub_langdetect(monkeypatch, detect_fn):
+    mod = types.ModuleType("langdetect")
+    mod.detect = detect_fn
+    monkeypatch.setitem(sys.modules, "langdetect", mod)
+
+
+def test_caption_language_english(monkeypatch):
+    _stub_langdetect(monkeypatch, lambda text: "en")
+    prof = {"latestPosts": [{"caption": "check out my new video"},
+                            {"caption": "best tips for growth"}]}
+    assert caption_language(prof) == "en"
+
+
+def test_caption_language_modal_when_mixed(monkeypatch):
+    returns = iter(["ar", "ar", "en"])
+    _stub_langdetect(monkeypatch, lambda text: next(returns))
+    prof = {"latestPosts": [{"caption": "a"}, {"caption": "b"}, {"caption": "c"}]}
+    assert caption_language(prof) == "ar"
+
+
+def test_caption_language_unknown_when_no_captions():
+    assert caption_language({"latestPosts": []}) == "unknown"
+    assert caption_language({}) == "unknown"
+
+
+def test_caption_language_unknown_when_langdetect_missing(monkeypatch):
+    # Setting sys.modules[name] = None makes `from langdetect import detect` raise ImportError
+    monkeypatch.setitem(sys.modules, "langdetect", None)
+    prof = {"latestPosts": [{"caption": "hello"}]}
+    assert caption_language(prof) == "unknown"
