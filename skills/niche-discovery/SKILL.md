@@ -107,11 +107,26 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/discovery_score.py" \
   --input "${CLAUDE_PROJECT_DIR}/temp/candidate_handles.json" \
   --output "${CLAUDE_PROJECT_DIR}/temp/scored_handles.json" \
   --top-n 10 \
-  --min-followers 1000
+  --min-followers 10000
 ```
-`--min-followers` (default 1000) drops tiny accounts that would otherwise score
-alongside established creators. Lower it to surface micro-creators. Present the
-ranked table (rank, handle, score, eng rate, hashtags, followers). User picks 3-5.
+`--min-followers` (default 10,000) prefers established creators. When fewer than
+~5 candidates clear it, Phase C reveals the next tier flagged `below_follower_floor`
+so you still have a menu instead of an empty result. Lower the flag (e.g. `1000`)
+for micro-creator niches.
+
+Present the ranked table with three signals next to each candidate:
+`handle  score  followers  LANG  flags` — e.g.
+`sunnyame1ia  0.62  8.2K  EN  ⚠below-floor` · `glamwithrida  0.56  1.5K  AR?  ⚠below-floor` ·
+`viral_account  0.80  50K  EN  ⚠anomaly`.
+
+At pick time, surface these for the user's decision:
+- **LANG** — the user recognizes their target market's language; skip codes that
+  don't match (no target-language input is required — codes are advisory).
+- **⚠anomaly** — `engagement_rate > 100%`; usually a viral post where likes
+  exceeded followers. Consider, don't auto-pick.
+- **⚠below-floor** — below the 10K follower preference; consider, don't auto-pick.
+
+User picks 3-5.
 
 ## Shortlist + write config
 
