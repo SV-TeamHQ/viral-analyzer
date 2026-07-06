@@ -7,6 +7,7 @@ the same temp/candidate_handles.json contract Phase C already consumes.
 Routed in by the niche-discovery skill when the user gives a seed handle.
 """
 import argparse
+import json
 import os
 import pathlib
 import sys
@@ -53,3 +54,38 @@ def discover_from_seed(seed: str, niche: str, token: str) -> tuple[list[dict], s
     if len(related) < THIN_THRESHOLD:
         return candidates, "thin"
     return candidates, "ok"
+
+
+_CAUSE_MESSAGES = {
+    "thin":      "THIN CLUSTER: {n} profiles from seed @{seed}",
+    "not_found": "SEED NOT FOUND: @{seed}",
+    "private":   "SEED PRIVATE: @{seed} has no related profiles",
+    "actor_error": "SEED FAILED: @{seed} — actor raised",
+}
+
+
+def main(seed: str, niche: str, output_path: str) -> None:
+    project_dir = str(pathlib.Path(output_path).resolve().parent.parent)
+    load_env(project_dir)
+    token = os.environ.get("APIFY_TOKEN")
+    if not token:
+        raise RuntimeError("APIFY_TOKEN not set")
+    candidates, reason = discover_from_seed(seed, niche, token)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(candidates, f, indent=2)
+    if reason == "ok":
+        print(f"Wrote {len(candidates)} candidate handles -> {output_path}")
+        return
+    n = len(candidates)
+    print(_CAUSE_MESSAGES[reason].format(n=n, seed=seed))
+    sys.exit(1)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Profile-first Phase B (seed -> relatedProfiles)")
+    parser.add_argument("--seed", required=True, help="seed creator handle (username)")
+    parser.add_argument("--niche", required=True, help="niche label tagging the run")
+    parser.add_argument("--output", default="temp/candidate_handles.json")
+    args = parser.parse_args()
+    main(args.seed, args.niche, args.output)

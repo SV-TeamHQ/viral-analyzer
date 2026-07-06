@@ -1,5 +1,6 @@
 import sys, pathlib
 from unittest.mock import patch
+import json
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from scripts.discovery_profiles import discover_from_seed, THIN_THRESHOLD
 
@@ -83,3 +84,30 @@ def test_related_entry_missing_username_is_skipped(monkeypatch):
         candidates, reason = discover_from_seed("cristiano", "fitness", "tok")
     assert reason == "ok"
     assert all(c["handle"] != "999" and c["handle"] for c in candidates)
+
+
+def test_main_writes_candidates_and_exits_zero_on_ok(tmp_path, monkeypatch):
+    related = [_rel(f"u{i}") for i in range(10)]
+    out = tmp_path / "candidate_handles.json"
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_profiles.run_actor", return_value=[_prof(related)]):
+        from scripts.discovery_profiles import main
+        main("cristiano", "fitness", str(out))
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert any(c["handle"] == "cristiano" for c in data)
+    assert all(c["hashtags"] == [] and c["niche"] == "fitness" for c in data)
+
+
+def test_main_writes_json_then_exits_nonzero_on_thin(tmp_path, monkeypatch):
+    related = [_rel("u0"), _rel("u1")]   # thin
+    out = tmp_path / "candidate_handles.json"
+    monkeypatch.setenv("APIFY_TOKEN", "tok")
+    with patch("scripts.discovery_profiles.run_actor", return_value=[_prof(related)]):
+        import pytest
+        from scripts.discovery_profiles import main
+        with pytest.raises(SystemExit) as exc:
+            main("cristiano", "fitness", str(out))
+        assert exc.value.code == 1
+    # JSON still written so the skill can offer "proceed"
+    data = json.loads(out.read_text(encoding="utf-8"))
+    assert len(data) == 3   # 2 related + seed
