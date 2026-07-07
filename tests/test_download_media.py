@@ -3,7 +3,7 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
-from scripts.download_media import download_single, download_all_media
+from scripts.download_media import download_single, download_all_media, main
 
 
 SAMPLE_VIDEO_POST = {
@@ -83,3 +83,29 @@ class TestDownloadAllMedia:
 
         download_all_media(posts, "/tmp/media")
         assert mock_sleep.call_count == 1
+
+
+class TestMainUtf8:
+    @patch("scripts.download_media.download_all_media")
+    def test_main_round_trips_non_ascii_selected_posts(self, mock_download, tmp_path):
+        # Bug 3 (download_media): main() reads selected_posts.json, then rewrites
+        # it in place with local_media_path attached. Both opens must be UTF-8 so
+        # emoji/non-ASCII captions don't UnicodeDecodeError on cp1252 Windows.
+        # (Portability guard — passes on UTF-8-default locales, catches the
+        # regression on cp1252 Windows where the crash was reported.)
+        selected = tmp_path / "selected.json"
+        payload = [{"id": "IMG1", "media_url": "https://cdn.example.com/i.jpg",
+                    "media_type": "image", "handle": "alice",
+                    "caption": "fire \U0001f525 emoji é"}]
+        selected.write_text(json.dumps(payload), encoding="utf-8")
+
+        def fake_download(posts, output_dir):
+            return [{**p, "local_media_path": f"{output_dir}/{p['id']}.jpg"}
+                    for p in posts]
+        mock_download.side_effect = fake_download
+
+        main(str(selected), str(tmp_path / "media"))
+
+        rewritten = json.loads(selected.read_text(encoding="utf-8"))
+        assert rewritten[0]["caption"] == "fire \U0001f525 emoji é"
+        assert rewritten[0]["local_media_path"].endswith("IMG1.jpg")

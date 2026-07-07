@@ -53,12 +53,12 @@ def download_all_media(posts: list[dict], output_dir: str) -> list[dict]:
 
 
 def main(input_path: str, output_dir: str) -> None:
-    with open(input_path) as f:
+    with open(input_path, encoding="utf-8") as f:
         posts = json.load(f)
 
     results = download_all_media(posts, output_dir)
 
-    with open(input_path, "w") as f:
+    with open(input_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 
     downloaded = sum(1 for p in results if p["local_media_path"])
