@@ -2,7 +2,7 @@ import json
 import os
 import pytest
 
-from scripts.merge_analyses import load_analysis, merge_analyses
+from scripts.merge_analyses import load_analysis, merge_analyses, main
 
 
 SELECTED = [
@@ -77,3 +77,22 @@ class TestMergeAnalyses:
         assert merged[0]["spoken_hook"] == analysis["spoken_hook"]
         # ground-truth handle still wins over the agent's
         assert merged[0]["handle"] == "alice"
+
+
+class TestMainReadsUtf8:
+    def test_main_reads_non_ascii_selected_posts(self, tmp_path):
+        # Bug 3: selected_posts.json must be read as UTF-8. On Windows the OS
+        # default (cp1252) crashes with UnicodeDecodeError on emoji captions.
+        # Write the file as UTF-8 (how the scraper writes it), then read it back
+        # through main() — it must not raise, and the caption must survive intact.
+        selected = tmp_path / "selected.json"
+        payload = [{"id": "C1", "handle": "alice", "url": "u", "likes": 5,
+                    "comments": 1, "views": 10, "outlier_score": 1.0,
+                    "caption": "fire \U0001f525 emoji é"}]
+        selected.write_text(json.dumps(payload), encoding="utf-8")
+        out = tmp_path / "merged.json"
+
+        main(str(selected), str(tmp_path / "analyses"), str(out))
+
+        merged = json.loads(out.read_text(encoding="utf-8"))
+        assert merged[0]["caption"] == "fire \U0001f525 emoji é"

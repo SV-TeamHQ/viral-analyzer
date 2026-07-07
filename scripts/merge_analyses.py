@@ -36,7 +36,7 @@ def merge_analyses(posts: list[dict], analyses_dir: str) -> list[dict]:
 
 
 def main(selected_path: str, analyses_dir: str, output_path: str) -> None:
-    with open(selected_path) as f:
+    with open(selected_path, encoding="utf-8") as f:
         posts = json.load(f)
     merged = merge_analyses(posts, analyses_dir)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
