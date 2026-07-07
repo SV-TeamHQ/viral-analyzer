@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 
 from scripts.generate_report import (
-    encode_frame, build_summary, render_report, generate_report,
+    encode_frame, build_summary, render_report, generate_report, get_thumbnail,
 )
 
 
@@ -75,6 +75,38 @@ class TestEncodeFrame:
 
     def test_returns_none_when_missing(self, tmp_path):
         assert encode_frame(str(tmp_path / "nope.jpg")) is None
+
+
+class TestGetThumbnail:
+    def test_uses_first_frame_when_present(self, tmp_path):
+        frame = tmp_path / "frame.jpg"
+        frame.write_bytes(b"\xff\xd8\xff\xe0framebytes")
+        a = {"id": "A1", "frames": [str(frame)]}
+        uri = get_thumbnail(a, media_dir=str(tmp_path / "media"))
+        assert uri and uri.startswith("data:image/jpeg;base64,")
+
+    def test_falls_back_to_downloaded_cover_when_no_frames(self, tmp_path):
+        # Bug 2: a post with frames: [] should still thumbnail from temp/media/{id}.jpg
+        media = tmp_path / "media"
+        media.mkdir()
+        (media / "A1.jpg").write_bytes(b"\xff\xd8\xff\xe0coverbytes")
+        a = {"id": "A1", "frames": []}
+        uri = get_thumbnail(a, media_dir=str(media))
+        assert uri and uri.startswith("data:image/jpeg;base64,")
+        assert base64.b64decode(uri.split(",", 1)[1]) == b"\xff\xd8\xff\xe0coverbytes"
+
+    def test_returns_none_when_no_frame_and_no_cover(self, tmp_path):
+        a = {"id": "NOPE", "frames": []}
+        assert get_thumbnail(a, media_dir=str(tmp_path / "media")) is None
+
+    def test_video_cover_not_misencoded_as_jpeg(self, tmp_path):
+        # A video post saves as .mp4; it must not be base64-encoded as a broken
+        # jpeg data URI. Only image-type covers qualify as a static thumbnail.
+        media = tmp_path / "media"
+        media.mkdir()
+        (media / "V1.mp4").write_bytes(b"\x00\x00\x00\x20ftypmp42")
+        a = {"id": "V1", "frames": []}
+        assert get_thumbnail(a, media_dir=str(media)) is None
 
 
 class TestBuildSummary:
@@ -182,3 +214,40 @@ class TestGenerateReport:
         path = generate_report(str(analyses_file), str(tmp_path / "reports"), summary_path=None)
         name = os.path.basename(path)
         assert re.match(r"IG-Competitor-Research_\d{4}-\d{2}-\d{2}_\d{4}\.html$", name), name
+
+    def test_patterns_summary_wins_over_stale_summary_file(self, tmp_path):
+        # Bug 1: a leftover temp/niche_summary.txt from a previous run (different
+        # niche) must NOT override a valid patterns.summary. patterns is the
+        # authoritative synthesis; the text file is only a manual fallback.
+        analyses_file = tmp_path / "analyses.json"
+        analyses_file.write_text(json.dumps(ANALYSES))
+        patterns_file = tmp_path / "patterns.json"
+        patterns_file.write_text(json.dumps(
+            {"summary": "PATTERNS-AUTHORITATIVE-SUMMARY",
+             "hook_types": [], "formats": [], "topics": []}))
+        stale_summary = tmp_path / "niche_summary.txt"
+        stale_summary.write_text("STALE-SUMMARY-FROM-ANOTHER-NICHE")
+
+        out = generate_report(str(analyses_file), str(tmp_path / "out"),
+                              summary_path=str(stale_summary),
+                              patterns_path=str(patterns_file),
+                              date_str="2026-07-06", pdf=False)
+        html = open(out, encoding="utf-8").read()
+        assert "PATTERNS-AUTHORITATIVE-SUMMARY" in html
+        assert "STALE-SUMMARY-FROM-ANOTHER-NICHE" not in html
+
+    def test_text_summary_used_when_no_patterns_summary(self, tmp_path):
+        # The text file is still honored as a fallback when patterns has no summary.
+        analyses_file = tmp_path / "analyses.json"
+        analyses_file.write_text(json.dumps(ANALYSES))
+        patterns_file = tmp_path / "patterns.json"
+        patterns_file.write_text(json.dumps({"hook_types": []}))  # no "summary"
+        summary_file = tmp_path / "niche_summary.txt"
+        summary_file.write_text("MANUAL-FALLBACK-SUMMARY")
+
+        out = generate_report(str(analyses_file), str(tmp_path / "out"),
+                              summary_path=str(summary_file),
+                              patterns_path=str(patterns_file),
+                              date_str="2026-07-06", pdf=False)
+        html = open(out, encoding="utf-8").read()
+        assert "MANUAL-FALLBACK-SUMMARY" in html

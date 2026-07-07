@@ -23,6 +23,25 @@ def encode_frame(path: str) -> str | None:
         return "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
 
 
+# Image-type cover extensions. Video covers (.mp4) are excluded — a video file
+# is not a usable static thumbnail and must not be base64-encoded as a jpeg.
+_IMAGE_COVER_EXTS = (".jpg", ".jpeg", ".png", ".webp")
+
+
+def get_thumbnail(a: dict, media_dir: str = "temp/media") -> str | None:
+    """Pick a thumbnail for a post: first extracted frame, else the downloaded
+    cover image (image/carousel posts). Video covers and missing files -> None."""
+    frames = a.get("frames") or []
+    if frames:
+        return encode_frame(frames[0])
+    # Bug 2: posts whose frames weren't extracted (frames: []) still have a
+    # downloaded cover in temp/media/{id}.{ext}. Only image-type covers qualify.
+    cover = a.get("local_media_path") or os.path.join(media_dir, f"{a.get('id')}.jpg")
+    if cover and str(cover).lower().endswith(_IMAGE_COVER_EXTS):
+        return encode_frame(cover)
+    return None
+
+
 def build_summary(analyses: list[dict], patterns: dict | None = None) -> str:
     if patterns and patterns.get("summary"):
         return patterns["summary"]
@@ -38,13 +57,14 @@ def build_summary(analyses: list[dict], patterns: dict | None = None) -> str:
     )
 
 
-def render_report(analyses, summary, date_str, template_path, patterns=None):
+def render_report(analyses, summary, date_str, template_path, patterns=None,
+                  media_dir: str = "temp/media"):
     posts = []
     for idx, a in enumerate(analyses, start=1):
         posts.append({
             **a,
             "rank": idx,
-            "thumbnail": encode_frame((a.get("frames") or [None])[0]),
+            "thumbnail": get_thumbnail(a, media_dir=media_dir),
         })
     env = Environment(
         loader=FileSystemLoader(os.path.dirname(template_path)),
@@ -70,8 +90,14 @@ def generate_report(input_path: str, output_dir: str, summary_path: str | None =
         with open(patterns_path, encoding="utf-8") as f:
             patterns = json.load(f)
 
+    # patterns.summary is the authoritative synthesis (built by the
+    # pattern-synthesizer for THIS run's niche). The text summary file is only
+    # a manual fallback when patterns has no summary — so a stale leftover
+    # temp/niche_summary.txt from a previous run can't silently poison the
+    # report (Bug 1).
     summary = build_summary(analyses, patterns)
-    if summary_path and os.path.exists(summary_path):
+    has_patterns_summary = bool(patterns and patterns.get("summary"))
+    if not has_patterns_summary and summary_path and os.path.exists(summary_path):
         with open(summary_path, encoding="utf-8") as f:
             summary = f.read().strip() or summary
 
